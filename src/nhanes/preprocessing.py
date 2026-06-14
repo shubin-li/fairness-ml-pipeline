@@ -3,7 +3,7 @@ Shubin Li
 
 whole preprocessing
 
-data clean | feature engineering | merge
+data clean | feature engineering | merge | drop_impute_encoding | check&fix Multicollinearity
 """
 
 import pandas as pd
