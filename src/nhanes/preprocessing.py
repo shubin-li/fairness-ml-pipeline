@@ -399,7 +399,7 @@ def processing_tables(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
     miss = pd.Series(miss).sort_values(ascending=False)
     for k, v in miss.items():
         print(f"{k} missing : {v:.1%}")
-    print("clean & feature engineering & merge over\n")
+    print("1:  clean & feature engineering & merge over\n" + "=" * 50)
 
     return merged
 
@@ -502,7 +502,7 @@ def drop_impute_encoding(df: pd.DataFrame) -> pd.DataFrame:
     # RIAGENDR -> 1=Male 2=Female -> 0 male,  1 female
     merged = merged.rename(columns={"RIAGENDR": "gender"})
     merged["gender"] = merged["gender"].map({1: 0, 2: 1})
-    print("drop_impute_encoding over\n")
+    print("2: drop_impute_encoding over\n" + "=" * 50)
 
     # DMDMARTZ
 
@@ -586,8 +586,18 @@ def check_fix_Multicollinearity(df: pd.DataFrame) -> pd.DataFrame:
     # income_group and has_saving =  0.51
     corr = check_df[binary_ordinal_cols].corr(method="spearman")
     print(corr.round(2))
-    print("check_fix_Multicollinearity over")
+    print("3: check_fix_Multicollinearity over\n" + "=" * 50)
     return check_df
+
+
+def run_all_preprocessing() -> pd.DataFrame:
+    import data_loader
+
+    tables = data_loader.load_xpt_files()
+    merged = processing_tables(tables)
+    pre_modeling = drop_impute_encoding(merged)
+    fixed_Multicollinearity = check_fix_Multicollinearity(pre_modeling)
+    return fixed_Multicollinearity
 
 
 if __name__ == "__main__":
