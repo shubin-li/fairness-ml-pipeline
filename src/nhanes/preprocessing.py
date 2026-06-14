@@ -391,9 +391,15 @@ def processing_tables(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
     print(f"merged over, shape: {merged.shape}\n")
 
     print("missing:" + "=" * 50)
+    miss = {}
     for col in merged.columns:
         missing_per = merged[col].isna().mean()
-        print(f"{col} missing : {missing_per:.1%}")
+        miss[col] = missing_per
+
+    miss = pd.Series(miss).sort_values(ascending=False)
+    for k, v in miss.items():
+        print(f"{k} missing : {v:.1%}")
+    print("clean & feature engineering & merge over\n")
 
     return merged
 
@@ -405,12 +411,12 @@ Primary table: DPQ_L, left-joined to 9 supplementary tables via SEQN.
 SEQN                 Respondent ID, integer. From DPQ_L                                                                (drop before modeling)
 PHQ9_score           PHQ-9 total score, 0–27 integer. From DPQ_L                                                       (drop before modeling)
 depressed            Prediction target, 1 if PHQ9 >= 10, else 0. From DPQ_L                                            (target)
-RIAGENDR             Gender, 1=Male 2=Female. From DEMO_L                                                              (sensitive attribute)
+RIAGENDR             Gender, 1=Male 2=Female. From DEMO_L                                                    (sensitive attribute)
 RIDAGEYR             Age at screening, 18+. From DEMO_L
 RIDRETH3             Original race/ethnicity code, 1–7 (used to derive race_group). From DEMO_L                        (drop before modeling)
 DMDEDUC2             Adult education level, 1–5 ordinal. From DEMO_L
 DMDMARTZ             Marital status, 1=Married/Cohabiting 2=Widowed/Divorced/Separated 3=Never married. From DEMO_L
-INDFMPIR             Family income-to-poverty ratio, 0–5 continuous (used to derive income_group). From DEMO_L
+INDFMPIR             Family income-to-poverty ratio, 0–5 continuous (used to derive income_group). From DEMO_L          (drop before modeling)
 income_group         Income tier, Low income / Near poverty / Above threshold, 3-level ordinal. From DEMO_L             (sensitive attribute)
 race_group           Race category, Hispanic / White / Black / Asian / Other Race, 5-level nominal. From DEMO_L         (sensitive attribute)
 SLD012               Average weekday sleep hours, continuous. From SLQ_L
@@ -427,12 +433,167 @@ has_insurance        Has health insurance, 0/1. From HIQ_L
 has_diabetes         Diabetes or borderline, 0/1. From DIQ_L
 BMXBMI               Body Mass Index (kg/m2), continuous. From BMX_L
 waist_to_height_ratio Waist-to-height ratio (BMXWAIST / BMXHT), continuous. From BMX_L
+
+chagnge:
+RIAGENDR rename to Gender -> 0 , 1
+drop waist_to_height_ratio because Multicollinearity
+income_group -> from categorical to ordinal numeric 0,1,2
+race_group -> one-hot to 4 col, exclude white
+
 """
+
+""" 
+missing - impute
+income_group          missing: 12.1%    Discrete ordinal
+INDFMPIR              missing: 12.1%    drop
+has_saving            missing: 10.6%    Discrete binary
+DMDMARTZ              missing:  4.6%    Discrete nominal
+DMDEDUC2              missing:  4.5%    Discrete ordinal
+waist_to_height_ratio missing:  3.0%    continuous
+sleep_catchup         missing:  1.3%    continuous
+total_pa_min_wk       missing:  1.1%    continuous
+SLD012                missing:  1.0%    continuous
+BMXBMI                missing:  0.9%    continuous
+binge_days_per_year   missing:  0.8%    continuous
+PAD680                missing:  0.6%    continuous
+alc_days_per_year     missing:  0.5%    continuous
+ever_drinker          missing:  0.4%    Discrete binary
+cigs_per_day          missing:  0.4%    continuous
+has_insurance         missing:  0.2%    Discrete binary
+smoke_status          missing:  0.2%    Discrete ordinal
+has_diabetes          missing:  0.0%    Discrete binary
+depressed             missing:  0.0%    Discrete binary
+RIDRETH3              missing:  0.0%    drop
+RIDAGEYR              missing:  0.0%    continuous
+PHQ9_score            missing:  0.0%    drop
+race_group            missing:  0.0%    Discrete nominal
+RIAGENDR              missing:  0.0%    Discrete nominal&binary
+SEQN                  missing:  0.0%    drop
+
+"""
+
+
+def drop_impute_encoding(df: pd.DataFrame) -> pd.DataFrame:
+
+    merged = df.copy()
+    drop_cols = ["SEQN", "PHQ9_score", "RIDRETH3", "INDFMPIR"]
+    merged = merged.drop(columns=drop_cols)
+
+    # fmt: off
+    impute_with_mode_cols = ["income_group", "has_saving", "DMDMARTZ", "DMDEDUC2", "ever_drinker", "has_insurance", "smoke_status"]
+    impute_with_median_cols = ["waist_to_height_ratio", "sleep_catchup", "total_pa_min_wk", "SLD012", "BMXBMI", "binge_days_per_year", "PAD680", "alc_days_per_year", "cigs_per_day"]
+    # fmt: on
+
+    for c in impute_with_mode_cols:
+        merged[c] = merged[c].fillna(merged[c].mode()[0])
+
+    for c in impute_with_median_cols:
+        merged[c] = merged[c].fillna(merged[c].median())
+
+    # encoding
+
+    # income_group ordinal ->  Low income / Near poverty / Above threshold -> 0 ,1 ,2
+    merged["income_group"] = merged["income_group"].cat.codes
+
+    # race_group norminal  -> one_hot, drop White (reference for Logistic Regression)
+    merged = pd.get_dummies(merged, columns=["race_group"], drop_first=False, dtype=int)
+    merged = merged.drop(columns=["race_group_White"])
+
+    # RIAGENDR -> 1=Male 2=Female -> 0 male,  1 female
+    merged = merged.rename(columns={"RIAGENDR": "gender"})
+    merged["gender"] = merged["gender"].map({1: 0, 2: 1})
+    print("drop_impute_encoding over\n")
+
+    # DMDMARTZ
+
+    return merged
+
+
+def check_fix_Multicollinearity(df: pd.DataFrame) -> pd.DataFrame:
+    """
+        expirement 1:  waist_to_height_ratio and  BMXBMI are severe Multicollinearity, we drop waist_to_height_ratio
+           feature        VIF
+    waist_to_height_ratio 159.657443
+                   BMXBMI  88.222830
+                   SLD012  17.300292
+                 RIDAGEYR  11.995173
+                   PAD680   4.165814
+        alc_days_per_year   2.091729
+      binge_days_per_year   1.658630
+          total_pa_min_wk   1.268709
+            sleep_catchup   1.237493
+             cigs_per_day   1.119837
+
+        # "waist_to_height_ratio",
+
+        expirement 2:  tree-based model not influence by Multicollinearity
+            feature       VIF
+                 BMXBMI 13.933366
+                 SLD012 13.517544
+               RIDAGEYR  8.326696
+                 PAD680  4.122263
+      alc_days_per_year  2.091613
+    binge_days_per_year  1.656028
+        total_pa_min_wk  1.268014
+          sleep_catchup  1.185699
+           cigs_per_day  1.109194
+    """
+
+    check_df = df.copy()
+    # continuous variable -> VIF   VIF = 1 / (1 - R²)  if R2=0.9 ->VIF=10
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+    continuous_cols = [
+        "RIDAGEYR",
+        "SLD012",
+        "sleep_catchup",
+        "PAD680",
+        "total_pa_min_wk",
+        "alc_days_per_year",
+        "binge_days_per_year",
+        "cigs_per_day",
+        "BMXBMI",
+    ]
+
+    VIF_df = check_df[continuous_cols]
+    vif = pd.DataFrame(
+        {
+            "feature": continuous_cols,
+            "VIF": [
+                variance_inflation_factor(VIF_df.values, i)
+                for i in range(len(continuous_cols))
+            ],
+        }
+    ).sort_values("VIF", ascending=False)
+
+    print(vif.to_string(index=False) + "\n")
+
+    # after check_Multicollinearity, we drop waist_to_height_ratio
+    check_df = check_df.drop(columns=["waist_to_height_ratio"])
+    print("after check_Multicollinearity, we drop waist_to_height_ratio")
+    # binary/ordinal  category variable -> Spearman corr
+    binary_ordinal_cols = [
+        "gender",
+        "DMDEDUC2",
+        "DMDMARTZ",
+        "smoke_status",
+        "income_group",
+        "ever_drinker",
+        "has_saving",
+        "has_insurance",
+        "has_diabetes",
+    ]
+    # income_group and has_saving =  0.51
+    corr = check_df[binary_ordinal_cols].corr(method="spearman")
+    print(corr.round(2))
+    print("check_fix_Multicollinearity over")
+    return check_df
 
 
 if __name__ == "__main__":
     import data_loader
 
     tables = data_loader.load_xpt_files()
-    merged_table = processing_tables(tables)
-    print("all table merged\n")
+    merged = processing_tables(tables)
+    pre_modeling = drop_impute_encoding(merged)
+    fixed_Multicollinearity = check_fix_Multicollinearity(pre_modeling)
