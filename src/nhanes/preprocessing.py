@@ -398,7 +398,7 @@ def processing_tables(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
     miss = pd.Series(miss).sort_values(ascending=False)
     for k, v in miss.items():
-        print(f"{k} missing : {v:.1%}")
+        print(f"{k} missing : {v:.2%}")
     print("1:  clean & feature engineering & merge over\n" + "=" * 50)
 
     return merged
@@ -461,7 +461,7 @@ ever_drinker          missing:  0.4%    Discrete binary
 cigs_per_day          missing:  0.4%    continuous
 has_insurance         missing:  0.2%    Discrete binary
 smoke_status          missing:  0.2%    Discrete ordinal
-has_diabetes          missing:  0.0%    Discrete binary
+has_diabetes          missing:  0.0%->0.02%    Discrete binary
 depressed             missing:  0.0%    Discrete binary
 RIDRETH3              missing:  0.0%    drop
 RIDAGEYR              missing:  0.0%    continuous
@@ -480,7 +480,7 @@ def drop_impute_encoding(df: pd.DataFrame) -> pd.DataFrame:
     merged = merged.drop(columns=drop_cols)
 
     # fmt: off
-    impute_with_mode_cols = ["income_group", "has_saving", "DMDMARTZ", "DMDEDUC2", "ever_drinker", "has_insurance", "smoke_status"]
+    impute_with_mode_cols = ["income_group", "has_saving", "DMDMARTZ", "DMDEDUC2", "ever_drinker", "has_insurance", "smoke_status",'has_diabetes']
     impute_with_median_cols = ["waist_to_height_ratio", "sleep_catchup", "total_pa_min_wk", "SLD012", "BMXBMI", "binge_days_per_year", "PAD680", "alc_days_per_year", "cigs_per_day"]
     # fmt: on
 
@@ -597,6 +597,7 @@ def run_all_preprocessing() -> pd.DataFrame:
     merged = processing_tables(tables)
     pre_modeling = drop_impute_encoding(merged)
     fixed_Multicollinearity = check_fix_Multicollinearity(pre_modeling)
+    print("=" * 50 + f"all preprocessing over, next step: modeling\n")
     return fixed_Multicollinearity
 
 
