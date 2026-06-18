@@ -1,0 +1,10 @@
+model,sensitive_attr,Equal Opportunity,Equalized Odds,Demographic Parity
+LogisticRegression,gender,0.1611,0.1611,0.1392
+LogisticRegression,income,0.4709,0.5795,0.5884
+LogisticRegression,race,0.6398,0.6398,0.4705
+RandomForest,gender,0.1657,0.1657,0.0506
+RandomForest,income,0.2787,0.3035,0.3167
+RandomForest,race,0.4500,0.4500,0.2366
+XGB,gender,0.1314,0.1314,0.0728
+XGB,income,0.4242,0.4479,0.4762
+XGB,race,0.6774,0.6774,0.3838

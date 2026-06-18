@@ -19,6 +19,9 @@ from sklearn.model_selection import StratifiedKFold, train_test_split, cross_val
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
+from pathlib import Path
+
+from nhanes import preprocessing
 
 RANDOM_STATE = 42
 TEST_SIZE = 0.2
@@ -177,7 +180,7 @@ def cross_validate_on_train(
         cv_df = pd.DataFrame(cv_score)
         pick_cols = [i for i in cv_df.columns if i.startswith("test_")]
         cv_df = cv_df[pick_cols]
-        fold_scores=cv_df.copy()
+        fold_scores = cv_df.copy()
         cv_df.loc["mean"] = fold_scores.mean()
         cv_df.loc["std"] = fold_scores.std()
         models_cv_score[name] = cv_df
@@ -226,8 +229,17 @@ def eval_on_test(
     return results
 
 
+def get_fitted_models_and_split_data() -> (
+    tuple[dict[str, Pipeline], pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]
+):
+    df = preprocessing.run_all_preprocessing()
+    X_train, X_test, y_train, y_test = _train_test_split(df)
+    models = get3_pipe_models(y_train)
+    fitted_models = fit_final_models(models, X_train, y_train)
+    return fitted_models, X_train, X_test, y_train, y_test
+
+
 def run_all_models() -> dict[str, Pipeline]:
-    import preprocessing
 
     df = preprocessing.run_all_preprocessing()
     X_train, X_test, y_train, y_test = _train_test_split(df)
@@ -235,7 +247,47 @@ def run_all_models() -> dict[str, Pipeline]:
     models_cv_score = cross_validate_on_train(models, X_train, y_train)
     fitted_models = fit_final_models(models, X_train, y_train)
     results = eval_on_test(fitted_models, X_test, y_test)
+    save_baseline_results(models_cv_score, results)
+
     return fitted_models
+
+
+"""
+Save baseline model performance results to disk.
+
+Two outputs:
+  1. CV scores  — per-fold + mean/std for each model
+  2. Test scores — final evaluation on held-out test set
+"""
+
+
+RESULTS_DIR = Path(__file__).parent.parent / "results" / "nhanes"
+
+
+def save_baseline_results(
+    cv_scores: dict[str, pd.DataFrame],
+    test_scores: pd.DataFrame,
+    results_dir: Path = RESULTS_DIR,
+):
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    #  CV scores: stack all models into one table 
+    cv_rows = []
+    for model_name, cv_df in cv_scores.items():
+        temp = cv_df.copy()
+        temp.insert(0, "model", model_name)
+        temp.insert(1, "fold", temp.index)
+        cv_rows.append(temp)
+
+    cv_all = pd.concat(cv_rows, ignore_index=True)
+    cv_path = results_dir / "nhanes_baseline_cv.csv"
+    cv_all.to_csv(cv_path, index=False, float_format="%.4f")
+    print(f"CV scores saved -> {cv_path}")
+
+    #  Test scores:  
+    test_path = results_dir / "nhanes_baseline_test.csv"
+    test_scores.to_csv(test_path, float_format="%.4f")
+    print(f"Test scores saved -> {test_path}")
 
 
 if __name__ == "__main__":

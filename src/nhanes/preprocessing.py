@@ -8,6 +8,7 @@ data clean | feature engineering | merge | drop_impute_encoding | check&fix Mult
 
 import pandas as pd
 import numpy as np
+from nhanes import data_loader
 
 
 # fix xpt zeros ->5.397605e-79
@@ -591,7 +592,6 @@ def check_fix_Multicollinearity(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def run_all_preprocessing() -> pd.DataFrame:
-    import data_loader
 
     tables = data_loader.load_xpt_files()
     merged = processing_tables(tables)
@@ -602,7 +602,6 @@ def run_all_preprocessing() -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    import data_loader
 
     tables = data_loader.load_xpt_files()
     merged = processing_tables(tables)
