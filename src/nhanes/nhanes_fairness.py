@@ -1,12 +1,14 @@
 """
-Shubin Li
+Author:Shubin Li
 
 call fairness_evaluation functions for nhanes dataset
 """
 
 import pandas as pd
+import numpy as np
 from nhanes import models
 from fairness_pipeline.fairness_eval import run_fairness_eval
+import fairness_pipeline.mitigation as mitigation
 from pathlib import Path
 
 
@@ -58,6 +60,7 @@ def run_fairness_eval_for_all() -> dict[str, dict[str, tuple[dict, pd.DataFrame]
     fitted_models, X_train, X_test, y_train, y_test = (
         models.get_fitted_models_and_split_data()
     )
+
     sensitive_df = extract_sensitive_attrs(X_test)
 
     for name, pipe in fitted_models.items():
@@ -72,9 +75,6 @@ def run_fairness_eval_for_all() -> dict[str, dict[str, tuple[dict, pd.DataFrame]
     return results
 
 
-
-
-
 RESULTS_DIR = Path(__file__).parent.parent / "results" / "nhanes"
 
 """
@@ -84,6 +84,8 @@ Two outputs:
   1. detail CSV  — per-group metrics for every (model, sensitive_attr) pair
   2. summary CSV — one row per (model, sensitive_attr), three fairness metrics values only
 """
+
+
 def save_fairness_results(
     all_results: dict[str, dict[str, tuple[dict, pd.DataFrame]]],
     results_dir: Path = RESULTS_DIR,
@@ -95,7 +97,7 @@ def save_fairness_results(
     for model_name, attr_dict in all_results.items():
         for attr_name, (summary, details_df) in attr_dict.items():
 
-            #  detail: flatten per-group rows 
+            #  detail: flatten per-group rows
             for group_name, row in details_df.iterrows():
                 detail_rows.append(
                     {
@@ -106,7 +108,7 @@ def save_fairness_results(
                     }
                 )
 
-            #  summary: one row per (model, attr) 
+            #  summary: one row per (model, attr)
             summary_rows.append(
                 {
                     "model": model_name,
@@ -134,5 +136,19 @@ def save_fairness_results(
 
 if __name__ == "__main__":
 
-    x = run_fairness_eval_for_all()
-    save_fairness_results(x)
+    # x = run_fairness_eval_for_all()
+    # save_fairness_results(x)
+
+
+    fitted_models, X_train, X_test, y_train, y_test = (
+        models.get_fitted_models_and_split_data()
+    )
+    extracted_sensitive_df = extract_sensitive_attrs(X_train)
+    
+    new_model=mitigation.fit_model_with_reweighing(fitted_models["XGB"], X_train, y_train, extracted_sensitive_df["race"])
+    mitigation_model = mitigation.apply_exponentiated_gradient(
+        fitted_models["XGB"], X_train, y_train, extracted_sensitive_df["race"]
+    )
+    # x=mitigation.apply_reweighing(X_train, y_train, extracted_sensitive_df["race"])
+    # print(np.unique(x, return_counts=True))
+    # print(pd.Series(x).value_counts())
