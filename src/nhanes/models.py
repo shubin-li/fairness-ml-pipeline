@@ -1,5 +1,5 @@
 """
-Shubin Li
+Author:Shubin Li
 
 train : LR , RF , XGBoost
 
