@@ -11,6 +11,16 @@ from fairness_pipeline.fairness_eval import run_fairness_eval
 import fairness_pipeline.mitigation as mitigation
 from pathlib import Path
 
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score,
+)
+
+RESULTS_DIR = Path(__file__).parent.parent / "results" / "nhanes"
+
 
 # restore sensitive attributes from encoded feature matrix
 def extract_sensitive_attrs(X: pd.DataFrame) -> pd.DataFrame:
@@ -75,7 +85,116 @@ def run_fairness_eval_for_all() -> dict[str, dict[str, tuple[dict, pd.DataFrame]
     return results
 
 
-RESULTS_DIR = Path(__file__).parent.parent / "results" / "nhanes"
+def _get_model_performance(y_test: pd.Series, y_pred: pd.Series, y_proba=None) -> dict:
+
+    row = {
+        "accuracy": accuracy_score(y_test, y_pred),
+        "precision": precision_score(y_test, y_pred, zero_division=0),
+        "recall": recall_score(y_test, y_pred, zero_division=0),
+        "f1": f1_score(y_test, y_pred, zero_division=0),
+    }
+
+    if y_proba is not None:
+        row["roc_auc"] = roc_auc_score(y_test, y_proba)
+    else:
+        row["roc_auc"] = np.NAN
+    return row
+
+
+def _get_model_fairness_eval(
+    y_test: pd.Series, y_pred: pd.Series, sensitive_col: pd.Series
+):
+    fairness_summary, fairness_details_df = run_fairness_eval(
+        y_true=y_test, y_pred=y_pred, sensitive_col=sensitive_col
+    )
+    return fairness_summary, fairness_details_df
+
+
+# 3个模型，针对3个敏感属性，执行4种mitigation方法，得到36个模型，针对每个模型，执行fairness_eval
+def run_all_mitigations():
+    """
+    Run the full 3 models × 3 attrs × 4 mitigation grid.
+
+    model | sensitive_attr | mitigation_method | performance_metrics | fairness_metrics
+    """
+
+    Baseline_models, X_train, X_test, y_train, y_test = (
+        models.get_fitted_models_and_split_data()
+    )
+    # sensitive_train_df for mitigation
+    # sensitive_test_df for fairness evaluation
+    sensitive_train_df = extract_sensitive_attrs(X_train)
+    sensitive_test_df = extract_sensitive_attrs(X_test)
+
+    all_results = []
+
+    for name, pipe in Baseline_models.items():
+        y_pred_base = pipe.predict(X_test)
+        y_proba_base = pipe.predict_proba(X_test)[:, 1]
+        performance_base = _get_model_performance(y_test, y_pred_base, y_proba_base)
+
+        for col in sensitive_train_df.columns:
+            sens_train = sensitive_train_df[col]
+            snes_test = sensitive_test_df[col]
+            fairness_summary_base, fairness_details_base = _get_model_fairness_eval(
+                y_test, y_pred_base, snes_test
+            )
+            # Baseline model performance and fairness evaluation
+            all_results.append(
+                _build_row(
+                    name, col, "Baseline", performance_base, fairness_summary_base
+                )
+            )
+
+            # reweighing 
+            rw_model = mitigation.fit_model_with_reweighing(
+                pipe, X_train, y_train, sens_train
+            )
+
+            y_pred_rw = rw_model.predict(X_test)
+            y_proba_rw = rw_model.predict_proba(X_test)[:, 1]
+            performance_rw = _get_model_performance(y_test, y_pred_rw, y_proba_rw)
+            fairness_summary_rw, fairness_details_rw = _get_model_fairness_eval(
+                y_test, y_pred_rw, snes_test
+            )
+            all_results.append(
+                _build_row(name, col, "Reweighing", performance_rw, fairness_summary_rw)
+            )
+
+            # ExponentiatedGradient
+            exg_model = mitigation.apply_exponentiated_gradient(
+                pipe, X_train, y_train, sens_train
+            )
+
+            # exponentiatedGradient don't support predict_proba
+            y_pred_exg = exg_model.predict(X_test)
+
+            performance_exg = _get_model_performance(y_test, y_pred_rw)
+            fairness_summary_exg, fairness_details_rw = _get_model_fairness_eval(
+                y_test, y_pred_exg, snes_test
+            )
+            all_results.append(
+                _build_row(name, col, "ExponentiatedGradient", performance_exg, fairness_summary_exg)
+            )
+
+            # 
+
+def _build_row(
+    model_name,
+    sensitive_attr,
+    mitigation_method,
+    performance: dict,
+    fairness_summary: dict,
+) -> dict:
+    row = {
+        "model": model_name,
+        "sensitive_attr": sensitive_attr,
+        "miti_method": mitigation_method,
+        **performance,
+        **fairness_summary,
+    }
+    return row
+
 
 """
 Save fairness evaluation results to disk.
@@ -139,23 +258,33 @@ if __name__ == "__main__":
     # x = run_fairness_eval_for_all()
     # save_fairness_results(x)
 
-
     fitted_models, X_train, X_test, y_train, y_test = (
         models.get_fitted_models_and_split_data()
     )
     extracted_sensitive_df = extract_sensitive_attrs(X_train)
-    
-    new_model=mitigation.fit_model_with_reweighing(fitted_models["LogisticRegression"], X_train, y_train, extracted_sensitive_df["income"])
+
+    new_model = mitigation.fit_model_with_reweighing(
+        fitted_models["LogisticRegression"],
+        X_train,
+        y_train,
+        extracted_sensitive_df["income"],
+    )
     mitigation_model = mitigation.apply_exponentiated_gradient(
-        fitted_models["LogisticRegression"], X_train, y_train, extracted_sensitive_df["income"]
+        fitted_models["LogisticRegression"],
+        X_train,
+        y_train,
+        extracted_sensitive_df["income"],
     )
     threshold_optimizer_model = mitigation.apply_threshold_optimizer(
-        fitted_models["LogisticRegression"], X_train, y_train, extracted_sensitive_df["income"]
+        fitted_models["LogisticRegression"],
+        X_train,
+        y_train,
+        extracted_sensitive_df["income"],
     )
 
-    supression_model,cols = mitigation.apply_suppression(
+    supression_model, cols = mitigation.apply_suppression(
         fitted_models["LogisticRegression"], X_train, y_train, ["income_group"]
-    ) 
+    )
     # x=mitigation.apply_reweighing(X_train, y_train, extracted_sensitive_df["race"])
     # print(np.unique(x, return_counts=True))
     # print(pd.Series(x).value_counts())

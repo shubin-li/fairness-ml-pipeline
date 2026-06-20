@@ -176,5 +176,5 @@ def apply_suppression(
     clone_model = clone(model)
 
     clone_model.fit(X_reduced, y_train)
-    
+
     return clone_model, X_reduced.columns.tolist()

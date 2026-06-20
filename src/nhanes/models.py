@@ -20,6 +20,13 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 from pathlib import Path
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score,
+)
 
 from nhanes import preprocessing
 
@@ -203,14 +210,6 @@ def eval_on_test(
     fitted_models: dict[str, Pipeline], X_test: pd.DataFrame, y_test: pd.Series
 ) -> pd.DataFrame:
 
-    from sklearn.metrics import (
-        accuracy_score,
-        precision_score,
-        recall_score,
-        f1_score,
-        roc_auc_score,
-    )
-
     rows = []
     for name, pipe in fitted_models.items():
         y_pred = pipe.predict(X_test)
@@ -271,7 +270,7 @@ def save_baseline_results(
 ):
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    #  CV scores: stack all models into one table 
+    #  CV scores: stack all models into one table
     cv_rows = []
     for model_name, cv_df in cv_scores.items():
         temp = cv_df.copy()
@@ -284,7 +283,7 @@ def save_baseline_results(
     cv_all.to_csv(cv_path, index=False, float_format="%.4f")
     print(f"CV scores saved -> {cv_path}")
 
-    #  Test scores:  
+    #  Test scores:
     test_path = results_dir / "nhanes_baseline_test.csv"
     test_scores.to_csv(test_path, float_format="%.4f")
     print(f"Test scores saved -> {test_path}")
@@ -292,7 +291,6 @@ def save_baseline_results(
 
 if __name__ == "__main__":
     run_all_models()
-
 
 
 """
