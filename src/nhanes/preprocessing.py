@@ -597,6 +597,10 @@ def run_all_preprocessing() -> pd.DataFrame:
     merged = processing_tables(tables)
     pre_modeling = drop_impute_encoding(merged)
     fixed_Multicollinearity = check_fix_Multicollinearity(pre_modeling)
+
+    print(
+        f"final columns: {fixed_Multicollinearity.columns.tolist()} shape: {fixed_Multicollinearity.shape}\n "
+    )
     print("=" * 50 + f"all preprocessing over, next step: modeling\n")
     return fixed_Multicollinearity
 

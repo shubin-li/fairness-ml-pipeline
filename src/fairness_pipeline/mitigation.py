@@ -31,6 +31,7 @@ from sklearn.base import clone
 import sklearn
 
 sklearn.set_config(enable_metadata_routing=True)
+from sklearn.model_selection import train_test_split
 
 from aif360.datasets import BinaryLabelDataset
 from aif360.algorithms.preprocessing import Reweighing
@@ -126,5 +127,54 @@ def apply_exponentiated_gradient(
 
     # Fit the model with the fairness constraint
     exp_grad.fit(X_train, y_train, sensitive_features=sensitive_col)
-
+    
     return exp_grad
+
+
+# for different sensitive groups, the ThresholdOptimizer will learn different thresholds for each group, base on the predicted probabilities from the model
+# for threshold_optimizer, need call threshold_optimizer.predict(X_test, random_state=..., sensitive_features...) to get the final predictions
+def apply_threshold_optimizer(
+    model, X_train: pd.DataFrame, y_train: pd.Series, sensitive_col: pd.Series
+):
+    # Define the fairness constraint
+    #  demographic_parity | equalized_odds | false_negative_rate_parity | false_positive_rate_parity | selection_rate_parity | true_negative_rate_parity | true_positive_rate_parity
+    constraint = "equalized_odds"
+
+    clone_model = clone(model)
+
+    # split the training data into train and validation sets for ThresholdOptimizer, to avoid data leakage
+    X_train_split, X_val_split, y_train_split, y_val_split = train_test_split(
+        X_train, y_train, test_size=0.2, random_state=42, stratify=y_train
+    )
+
+    clone_model.fit(X_train_split, y_train_split)
+
+    threshold_optimizer = ThresholdOptimizer(
+        estimator=clone_model,
+        prefit=True,
+        objective="accuracy_score",
+        constraints=constraint,
+        predict_method="predict_proba",
+    )
+
+    # Fit the ThresholdOptimizer on the validation set to learn group-specific thresholds
+    threshold_optimizer.fit(
+        X_val_split,
+        y_val_split,
+        sensitive_features=sensitive_col.loc[X_val_split.index],
+    )
+
+    return threshold_optimizer
+
+
+# baseline mitigation method
+# when you predict use this model, you need to drop the sensitive cols from the test set as well
+def apply_suppression(
+    model, X_train: pd.DataFrame, y_train: pd.Series, sensitive_col_name: list[str]
+):
+    X_reduced = X_train.drop(columns=sensitive_col_name)
+    clone_model = clone(model)
+
+    clone_model.fit(X_reduced, y_train)
+    
+    return clone_model, X_reduced.columns.tolist()

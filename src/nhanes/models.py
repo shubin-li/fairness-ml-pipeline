@@ -292,3 +292,35 @@ def save_baseline_results(
 
 if __name__ == "__main__":
     run_all_models()
+
+
+
+"""
+
+depressed            Prediction target. 1 if PHQ-9 >= 10, else 0.                                    Binary.          Target.                From DPQ_L.
+gender               Gender. 0 = Male, 1 = Female.                                                   Binary.          Sensitive attribute.    From DEMO_L.
+RIDAGEYR             Age at screening, 18+.                                                           Continuous.      Feature.               From DEMO_L.
+DMDEDUC2             Adult education level, 1-5.                                                      Ordinal.         Feature.               From DEMO_L.
+DMDMARTZ             Marital status. 1=Married/Cohabiting, 2=Widowed/Divorced/Separated, 3=Never.     Ordinal.         Feature.               From DEMO_L.
+income_group         Income tier from INDFMPIR. Low / Near poverty / Above threshold.                  Ordinal.         Sensitive attribute.    From DEMO_L.
+SLD012               Average weekday sleep hours.                                                      Continuous.      Feature.               From SLQ_L.
+sleep_catchup        Weekend minus weekday sleep difference, can be negative.                           Continuous.      Feature.               From SLQ_L.
+PAD680               Daily sedentary time in minutes.                                                  Continuous.      Feature.               From PAQ_L.
+total_pa_min_wk      Weekly total physical activity minutes, vigorous x2 weighted.                      Continuous.      Feature.               From PAQ_L.
+ever_drinker         Lifetime alcohol use.                                                             Binary.          Feature.               From ALQ_L.
+alc_days_per_year    Annualized drinking days, 11 mapped values from 0-365.                            Discrete.        Feature.               From ALQ_L.
+binge_days_per_year  Annualized binge drinking days, 11 mapped values from 0-365.                      Discrete.        Feature.               From ALQ_L.
+smoke_status         Smoking status. 0=Never, 1=Former, 2=Current.                                    Ordinal.         Feature.               From SMQ_L.
+cigs_per_day         Average daily cigarettes in past 30 days.                                         Continuous.      Feature.               From SMQ_L.
+has_saving           Family savings > $20,000.                                                         Binary.          Feature.               From INQ_L.
+has_insurance        Has health insurance.                                                             Binary.          Feature.               From HIQ_L.
+has_diabetes         Has diabetes or borderline diabetes.                                              Binary.          Feature.               From DIQ_L.
+BMXBMI               Body Mass Index in kg/m2.                                                         Continuous.      Feature.               From BMX_L.
+race_group_Asian     Race = Asian (dummy).                                                             Binary.          Sensitive attribute.    From DEMO_L.
+race_group_Black     Race = Black (dummy).                                                             Binary.          Sensitive attribute.    From DEMO_L.
+race_group_Hispanic  Race = Hispanic (dummy).                                                          Binary.          Sensitive attribute.    From DEMO_L.
+race_group_Other Race Race = Other Race (dummy).                                                       Binary.          Sensitive attribute.    From DEMO_L.
+
+Reference category for race: White (all four dummies = 0).
+Total: 23 columns (1 target + 6 sensitive + 16 features). N = 5,455.
+"""

@@ -145,10 +145,17 @@ if __name__ == "__main__":
     )
     extracted_sensitive_df = extract_sensitive_attrs(X_train)
     
-    new_model=mitigation.fit_model_with_reweighing(fitted_models["XGB"], X_train, y_train, extracted_sensitive_df["race"])
+    new_model=mitigation.fit_model_with_reweighing(fitted_models["LogisticRegression"], X_train, y_train, extracted_sensitive_df["income"])
     mitigation_model = mitigation.apply_exponentiated_gradient(
-        fitted_models["XGB"], X_train, y_train, extracted_sensitive_df["race"]
+        fitted_models["LogisticRegression"], X_train, y_train, extracted_sensitive_df["income"]
     )
+    threshold_optimizer_model = mitigation.apply_threshold_optimizer(
+        fitted_models["LogisticRegression"], X_train, y_train, extracted_sensitive_df["income"]
+    )
+
+    supression_model,cols = mitigation.apply_suppression(
+        fitted_models["LogisticRegression"], X_train, y_train, ["income_group"]
+    ) 
     # x=mitigation.apply_reweighing(X_train, y_train, extracted_sensitive_df["race"])
     # print(np.unique(x, return_counts=True))
     # print(pd.Series(x).value_counts())
