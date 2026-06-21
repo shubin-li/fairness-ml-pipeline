@@ -127,7 +127,7 @@ def apply_exponentiated_gradient(
 
     # Fit the model with the fairness constraint
     exp_grad.fit(X_train, y_train, sensitive_features=sensitive_col)
-    
+
     return exp_grad
 
 
@@ -152,7 +152,7 @@ def apply_threshold_optimizer(
     threshold_optimizer = ThresholdOptimizer(
         estimator=clone_model,
         prefit=True,
-        objective="accuracy_score",
+        objective="balanced_accuracy_score",
         constraints=constraint,
         predict_method="predict_proba",
     )

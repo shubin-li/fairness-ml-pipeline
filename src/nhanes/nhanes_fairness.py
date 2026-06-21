@@ -1,7 +1,7 @@
 """
 Author:Shubin Li
 
-call fairness_evaluation functions for nhanes dataset
+call fairness_evaluation and mitigation functions for nhanes dataset
 """
 
 import pandas as pd
@@ -65,6 +65,11 @@ def extract_sensitive_attrs(X: pd.DataFrame) -> pd.DataFrame:
 def run_fairness_eval_for_all() -> dict[str, dict[str, tuple[dict, pd.DataFrame]]]:
     """
     Run fairness evaluation for all sensitive attributes and all models
+
+    [DEPRECATED] Replaced by run_all_mitigations().
+    Baseline fairness eval is now included as 'Baseline' rows in the mitigation grid.
+    Kept for reference only.
+    
     """
     results = {}
     fitted_models, X_train, X_test, y_train, y_test = (
@@ -81,7 +86,7 @@ def run_fairness_eval_for_all() -> dict[str, dict[str, tuple[dict, pd.DataFrame]
                 y_true=y_test, y_pred=y_pred, sensitive_col=sensitive_df[col]
             )
             results[name][col] = (summary, details_df)
-
+    save_fairness_results(results)
     return results
 
 
@@ -110,8 +115,21 @@ def _get_model_fairness_eval(
     return fairness_summary, fairness_details_df
 
 
-# 3个模型，针对3个敏感属性，执行4种mitigation方法，得到36个模型，针对每个模型，执行fairness_eval
-def run_all_mitigations():
+# For supression
+SENS_COL_DICT = {
+    "gender": ["gender"],
+    "income": ["income_group"],
+    "race": [
+        "race_group_Asian",
+        "race_group_Black",
+        "race_group_Hispanic",
+        "race_group_Other Race",
+    ],
+}
+
+
+# 3 models, 3 sensitive features, 4 mitigation method +  1 baseline, got 45 records.
+def run_all_mitigations() -> list[dict]:
     """
     Run the full 3 models × 3 attrs × 4 mitigation grid.
 
@@ -135,18 +153,19 @@ def run_all_mitigations():
 
         for col in sensitive_train_df.columns:
             sens_train = sensitive_train_df[col]
-            snes_test = sensitive_test_df[col]
+            sens_test = sensitive_test_df[col]
             fairness_summary_base, fairness_details_base = _get_model_fairness_eval(
-                y_test, y_pred_base, snes_test
+                y_test, y_pred_base, sens_test
             )
-            # Baseline model performance and fairness evaluation
+            # 1. Baseline model performance and fairness evaluation
             all_results.append(
                 _build_row(
                     name, col, "Baseline", performance_base, fairness_summary_base
                 )
             )
 
-            # reweighing 
+            # 2. reweighing
+            print(f" >>>> {name} | {col} | Reweighing ...")
             rw_model = mitigation.fit_model_with_reweighing(
                 pipe, X_train, y_train, sens_train
             )
@@ -154,30 +173,82 @@ def run_all_mitigations():
             y_pred_rw = rw_model.predict(X_test)
             y_proba_rw = rw_model.predict_proba(X_test)[:, 1]
             performance_rw = _get_model_performance(y_test, y_pred_rw, y_proba_rw)
-            fairness_summary_rw, fairness_details_rw = _get_model_fairness_eval(
-                y_test, y_pred_rw, snes_test
+            fairness_summary_rw, _ = _get_model_fairness_eval(
+                y_test, y_pred_rw, sens_test
             )
             all_results.append(
                 _build_row(name, col, "Reweighing", performance_rw, fairness_summary_rw)
             )
 
-            # ExponentiatedGradient
+            # 3. ExponentiatedGradient
+            print(f" >>>> {name} | {col} | ExponentiatedGradient ...")
             exg_model = mitigation.apply_exponentiated_gradient(
                 pipe, X_train, y_train, sens_train
             )
 
             # exponentiatedGradient don't support predict_proba
-            y_pred_exg = exg_model.predict(X_test)
+            y_pred_exg = exg_model.predict(X_test, random_state=42)
 
-            performance_exg = _get_model_performance(y_test, y_pred_rw)
-            fairness_summary_exg, fairness_details_rw = _get_model_fairness_eval(
-                y_test, y_pred_exg, snes_test
+            performance_exg = _get_model_performance(y_test, y_pred_exg)
+            fairness_summary_exg, _ = _get_model_fairness_eval(
+                y_test, y_pred_exg, sens_test
             )
             all_results.append(
-                _build_row(name, col, "ExponentiatedGradient", performance_exg, fairness_summary_exg)
+                _build_row(
+                    name,
+                    col,
+                    "ExponentiatedGradient",
+                    performance_exg,
+                    fairness_summary_exg,
+                )
             )
 
-            # 
+            # 4. ThresholdOptimizer
+            print(f" >>>> {name} | {col} | ThresholdOptimizer ...")
+            to_model = mitigation.apply_threshold_optimizer(
+                pipe, X_train, y_train, sens_train
+            )
+
+            y_pred_to = to_model.predict(
+                X_test, random_state=42, sensitive_features=sens_test
+            )
+            # thresholdOptimizer do nothing with probability, but threshold, so probability same as baseline
+            performance_to = _get_model_performance(y_test, y_pred_to)
+            fairness_summary_to, _ = _get_model_fairness_eval(
+                y_test, y_pred_to, sens_test
+            )
+
+            all_results.append(
+                _build_row(
+                    name,
+                    col,
+                    "ThresholdOptimizer",
+                    performance_to,
+                    fairness_summary_to,
+                )
+            )
+
+            # 5 Suppression
+            print(f" >>>> {name} | {col} | Suppression ...")
+            sup_model, keep_cols = mitigation.apply_suppression(
+                pipe, X_train, y_train, SENS_COL_DICT[col]
+            )
+
+            X_test_reduced = X_test[keep_cols]
+            y_pred_sup = sup_model.predict(X_test_reduced)
+            y_proba_sup = sup_model.predict_proba(X_test_reduced)[:, 1]
+            performance_sup = _get_model_performance(y_test, y_pred_sup, y_proba_sup)
+            fairness_summary_sup, _ = _get_model_fairness_eval(
+                y_test, y_pred_sup, sens_test
+            )
+            all_results.append(
+                _build_row(
+                    name, col, "Suppression", performance_sup, fairness_summary_sup
+                )
+            )
+    save_mitigation_results(pd.DataFrame(all_results))
+    return all_results
+
 
 def _build_row(
     model_name,
@@ -194,6 +265,14 @@ def _build_row(
         **fairness_summary,
     }
     return row
+
+
+def save_mitigation_results(df: pd.DataFrame):
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = RESULTS_DIR / "nhanes_mitigation_results.csv"
+    df.to_csv(path, index=False, float_format="%.4f")
+    print(f"\nMitigation results saved -> {path}")
+    print(df.to_string(index=False))
 
 
 """
@@ -256,35 +335,5 @@ def save_fairness_results(
 if __name__ == "__main__":
 
     # x = run_fairness_eval_for_all()
-    # save_fairness_results(x)
-
-    fitted_models, X_train, X_test, y_train, y_test = (
-        models.get_fitted_models_and_split_data()
-    )
-    extracted_sensitive_df = extract_sensitive_attrs(X_train)
-
-    new_model = mitigation.fit_model_with_reweighing(
-        fitted_models["LogisticRegression"],
-        X_train,
-        y_train,
-        extracted_sensitive_df["income"],
-    )
-    mitigation_model = mitigation.apply_exponentiated_gradient(
-        fitted_models["LogisticRegression"],
-        X_train,
-        y_train,
-        extracted_sensitive_df["income"],
-    )
-    threshold_optimizer_model = mitigation.apply_threshold_optimizer(
-        fitted_models["LogisticRegression"],
-        X_train,
-        y_train,
-        extracted_sensitive_df["income"],
-    )
-
-    supression_model, cols = mitigation.apply_suppression(
-        fitted_models["LogisticRegression"], X_train, y_train, ["income_group"]
-    )
-    # x=mitigation.apply_reweighing(X_train, y_train, extracted_sensitive_df["race"])
-    # print(np.unique(x, return_counts=True))
-    # print(pd.Series(x).value_counts())
+    run_all_mitigations()
+    
