@@ -62,19 +62,16 @@ def extract_sensitive_attrs(X: pd.DataFrame) -> pd.DataFrame:
     return sensitive_df
 
 
-def run_fairness_eval_for_all() -> dict[str, dict[str, tuple[dict, pd.DataFrame]]]:
+def run_fairness_eval_for_all(
+    fitted_models: dict,
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
+) -> dict[str, dict[str, tuple[dict, pd.DataFrame]]]:
     """
     Run fairness evaluation for all sensitive attributes and all models
-
-    [DEPRECATED] Replaced by run_all_mitigations().
-    Baseline fairness eval is now included as 'Baseline' rows in the mitigation grid.
-    Kept for reference only.
     
     """
     results = {}
-    fitted_models, X_train, X_test, y_train, y_test = (
-        models.get_fitted_models_and_split_data()
-    )
 
     sensitive_df = extract_sensitive_attrs(X_test)
 
@@ -139,6 +136,10 @@ def run_all_mitigations() -> list[dict]:
     Baseline_models, X_train, X_test, y_train, y_test = (
         models.get_fitted_models_and_split_data()
     )
+
+    # baseline fairness detail/summary, same models & split as mitigation grid
+    run_fairness_eval_for_all(Baseline_models, X_test, y_test)
+
     # sensitive_train_df for mitigation
     # sensitive_test_df for fairness evaluation
     sensitive_train_df = extract_sensitive_attrs(X_train)

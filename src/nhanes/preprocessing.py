@@ -607,7 +607,4 @@ def run_all_preprocessing() -> pd.DataFrame:
 
 if __name__ == "__main__":
 
-    tables = data_loader.load_xpt_files()
-    merged = processing_tables(tables)
-    pre_modeling = drop_impute_encoding(merged)
-    fixed_Multicollinearity = check_fix_Multicollinearity(pre_modeling)
+    run_all_preprocessing()

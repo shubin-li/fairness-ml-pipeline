@@ -31,6 +31,12 @@ src/data
 src/nhanes/test*
 src/fairness_pipeline/test*
 
+# Ignore self use figure folder
+src/results/nhanes/figures/crossdomain/
+src/results/nhanes/figures/meeting/
+src/results/nhanes/figures/paper/
+src/results/nhanes/figures/ppt/
+
 # PyInstaller
 #   Usually these files are written by a python script from a template
 #   before PyInstaller builds the exe, so as to inject date/other infos into it.

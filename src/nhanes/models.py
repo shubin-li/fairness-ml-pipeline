@@ -231,10 +231,15 @@ def eval_on_test(
 def get_fitted_models_and_split_data() -> (
     tuple[dict[str, Pipeline], pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]
 ):
+
     df = preprocessing.run_all_preprocessing()
     X_train, X_test, y_train, y_test = _train_test_split(df)
     models = get3_pipe_models(y_train)
+    models_cv_score = cross_validate_on_train(models, X_train, y_train)
     fitted_models = fit_final_models(models, X_train, y_train)
+    results = eval_on_test(fitted_models, X_test, y_test)
+    save_baseline_results(models_cv_score, results)
+
     return fitted_models, X_train, X_test, y_train, y_test
 
 
