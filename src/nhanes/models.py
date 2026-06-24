@@ -238,7 +238,9 @@ def get_fitted_models_and_split_data() -> (
     models_cv_score = cross_validate_on_train(models, X_train, y_train)
     fitted_models = fit_final_models(models, X_train, y_train)
     results = eval_on_test(fitted_models, X_test, y_test)
-    save_baseline_results(models_cv_score, results)
+    train_results = eval_on_test(fitted_models, X_train, y_train)
+
+    save_baseline_results(models_cv_score, results,train_results)
 
     return fitted_models, X_train, X_test, y_train, y_test
 
@@ -251,7 +253,9 @@ def run_all_models() -> dict[str, Pipeline]:
     models_cv_score = cross_validate_on_train(models, X_train, y_train)
     fitted_models = fit_final_models(models, X_train, y_train)
     results = eval_on_test(fitted_models, X_test, y_test)
-    save_baseline_results(models_cv_score, results)
+    train_results = eval_on_test(fitted_models, X_train, y_train)
+
+    save_baseline_results(models_cv_score, results,train_results)
 
     return fitted_models
 
@@ -271,6 +275,7 @@ RESULTS_DIR = Path(__file__).parent.parent / "results" / "nhanes"
 def save_baseline_results(
     cv_scores: dict[str, pd.DataFrame],
     test_scores: pd.DataFrame,
+    train_scores: pd.DataFrame,
     results_dir: Path = RESULTS_DIR,
 ):
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -293,6 +298,10 @@ def save_baseline_results(
     test_scores.to_csv(test_path, float_format="%.4f")
     print(f"Test scores saved -> {test_path}")
 
+    #  Train scores:
+    train_path = results_dir / "nhanes_baseline_train.csv"
+    train_scores.to_csv(train_path, float_format="%.4f")
+    print(f"Train scores saved -> {train_path}")
 
 if __name__ == "__main__":
     run_all_models()
