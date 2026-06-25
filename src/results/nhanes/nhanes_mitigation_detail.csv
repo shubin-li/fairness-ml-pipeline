@@ -1,0 +1,151 @@
+model,sensitive_attr,miti_method,group,selection_rate,true_positive_rate,false_positive_rate,count,positive_rate
+LogisticRegression,gender,Baseline,Female,0.4258,0.7143,0.3716,620.0000,0.1581
+LogisticRegression,gender,Baseline,Male,0.2866,0.5532,0.2571,471.0000,0.0998
+LogisticRegression,gender,Reweighing,Female,0.3565,0.6327,0.3046,620.0000,0.1581
+LogisticRegression,gender,Reweighing,Male,0.3885,0.6596,0.3585,471.0000,0.0998
+LogisticRegression,gender,ExponentiatedGradient,Female,0.3661,0.6531,0.3123,620.0000,0.1581
+LogisticRegression,gender,ExponentiatedGradient,Male,0.3694,0.6170,0.3420,471.0000,0.0998
+LogisticRegression,gender,ThresholdOptimizer,Female,0.3516,0.6429,0.2969,620.0000,0.1581
+LogisticRegression,gender,ThresholdOptimizer,Male,0.3949,0.5957,0.3726,471.0000,0.0998
+LogisticRegression,gender,Suppression,Female,0.3548,0.6224,0.3046,620.0000,0.1581
+LogisticRegression,gender,Suppression,Male,0.3885,0.6383,0.3608,471.0000,0.0998
+LogisticRegression,income,Baseline,Above threshold,0.2238,0.4815,0.1947,800.0000,0.1013
+LogisticRegression,income,Baseline,Low income,0.8122,0.9524,0.7742,197.0000,0.2132
+LogisticRegression,income,Baseline,Near poverty,0.6383,0.7727,0.5972,94.0000,0.2340
+LogisticRegression,income,Reweighing,Above threshold,0.3425,0.6049,0.3129,800.0000,0.1013
+LogisticRegression,income,Reweighing,Low income,0.5025,0.6429,0.4645,197.0000,0.2132
+LogisticRegression,income,Reweighing,Near poverty,0.5000,0.7273,0.4306,94.0000,0.2340
+LogisticRegression,income,ExponentiatedGradient,Above threshold,0.0013,0.0000,0.0014,800.0000,0.1013
+LogisticRegression,income,ExponentiatedGradient,Low income,0.0000,0.0000,0.0000,197.0000,0.2132
+LogisticRegression,income,ExponentiatedGradient,Near poverty,0.0000,0.0000,0.0000,94.0000,0.2340
+LogisticRegression,income,ThresholdOptimizer,Above threshold,0.6088,0.7901,0.5883,800.0000,0.1013
+LogisticRegression,income,ThresholdOptimizer,Low income,0.6142,0.8095,0.5613,197.0000,0.2132
+LogisticRegression,income,ThresholdOptimizer,Near poverty,0.7128,0.8636,0.6667,94.0000,0.2340
+LogisticRegression,income,Suppression,Above threshold,0.2625,0.5062,0.2350,800.0000,0.1013
+LogisticRegression,income,Suppression,Low income,0.7157,0.8571,0.6774,197.0000,0.2132
+LogisticRegression,income,Suppression,Near poverty,0.6064,0.7727,0.5556,94.0000,0.2340
+LogisticRegression,race,Baseline,Asian,0.0556,0.1667,0.0417,54.0000,0.1111
+LogisticRegression,race,Baseline,Black,0.4733,0.6500,0.4414,131.0000,0.1527
+LogisticRegression,race,Baseline,Hispanic,0.5260,0.8065,0.4648,173.0000,0.1792
+LogisticRegression,race,Baseline,Other Race,0.5224,0.8000,0.4737,67.0000,0.1493
+LogisticRegression,race,Baseline,White,0.3123,0.6282,0.2704,666.0000,0.1171
+LogisticRegression,race,Reweighing,Asian,0.0556,0.1667,0.0417,54.0000,0.1111
+LogisticRegression,race,Reweighing,Black,0.4275,0.6000,0.3964,131.0000,0.1527
+LogisticRegression,race,Reweighing,Hispanic,0.4740,0.7097,0.4225,173.0000,0.1792
+LogisticRegression,race,Reweighing,Other Race,0.4776,0.8000,0.4211,67.0000,0.1493
+LogisticRegression,race,Reweighing,White,0.3333,0.6667,0.2891,666.0000,0.1171
+LogisticRegression,race,ExponentiatedGradient,Asian,0.0370,0.0000,0.0417,54.0000,0.1111
+LogisticRegression,race,ExponentiatedGradient,Black,0.0992,0.0000,0.1171,131.0000,0.1527
+LogisticRegression,race,ExponentiatedGradient,Hispanic,0.0751,0.1613,0.0563,173.0000,0.1792
+LogisticRegression,race,ExponentiatedGradient,Other Race,0.0896,0.1000,0.0877,67.0000,0.1493
+LogisticRegression,race,ExponentiatedGradient,White,0.0871,0.1538,0.0782,666.0000,0.1171
+LogisticRegression,race,ThresholdOptimizer,Asian,0.6667,0.5000,0.6875,54.0000,0.1111
+LogisticRegression,race,ThresholdOptimizer,Black,0.5802,0.5500,0.5856,131.0000,0.1527
+LogisticRegression,race,ThresholdOptimizer,Hispanic,0.5954,0.7097,0.5704,173.0000,0.1792
+LogisticRegression,race,ThresholdOptimizer,Other Race,0.4776,0.7000,0.4386,67.0000,0.1493
+LogisticRegression,race,ThresholdOptimizer,White,0.5886,0.6923,0.5748,666.0000,0.1171
+LogisticRegression,race,Suppression,Asian,0.2778,0.1667,0.2917,54.0000,0.1111
+LogisticRegression,race,Suppression,Black,0.6260,0.7500,0.6036,131.0000,0.1527
+LogisticRegression,race,Suppression,Hispanic,0.5549,0.8065,0.5000,173.0000,0.1792
+LogisticRegression,race,Suppression,Other Race,0.4478,0.7000,0.4035,67.0000,0.1493
+LogisticRegression,race,Suppression,White,0.2778,0.6154,0.2330,666.0000,0.1171
+RandomForest,gender,Baseline,Female,0.1419,0.3571,0.1015,620.0000,0.1581
+RandomForest,gender,Baseline,Male,0.0913,0.1915,0.0802,471.0000,0.0998
+RandomForest,gender,Reweighing,Female,0.1355,0.3367,0.0977,620.0000,0.1581
+RandomForest,gender,Reweighing,Male,0.1040,0.2340,0.0896,471.0000,0.0998
+RandomForest,gender,ExponentiatedGradient,Female,0.1306,0.3469,0.0900,620.0000,0.1581
+RandomForest,gender,ExponentiatedGradient,Male,0.1040,0.2128,0.0920,471.0000,0.0998
+RandomForest,gender,ThresholdOptimizer,Female,0.3968,0.7143,0.3372,620.0000,0.1581
+RandomForest,gender,ThresholdOptimizer,Male,0.4119,0.6596,0.3844,471.0000,0.0998
+RandomForest,gender,Suppression,Female,0.1274,0.3367,0.0881,620.0000,0.1581
+RandomForest,gender,Suppression,Male,0.1253,0.2553,0.1108,471.0000,0.0998
+RandomForest,income,Baseline,Above threshold,0.0488,0.1975,0.0320,800.0000,0.1013
+RandomForest,income,Baseline,Low income,0.3655,0.4762,0.3355,197.0000,0.2132
+RandomForest,income,Baseline,Near poverty,0.2128,0.3636,0.1667,94.0000,0.2340
+RandomForest,income,Reweighing,Above threshold,0.0625,0.2346,0.0431,800.0000,0.1013
+RandomForest,income,Reweighing,Low income,0.1726,0.2857,0.1419,197.0000,0.2132
+RandomForest,income,Reweighing,Near poverty,0.1489,0.3182,0.0972,94.0000,0.2340
+RandomForest,income,ExponentiatedGradient,Above threshold,0.0638,0.2222,0.0459,800.0000,0.1013
+RandomForest,income,ExponentiatedGradient,Low income,0.1269,0.1905,0.1097,197.0000,0.2132
+RandomForest,income,ExponentiatedGradient,Near poverty,0.1170,0.2727,0.0694,94.0000,0.2340
+RandomForest,income,ThresholdOptimizer,Above threshold,0.5250,0.5679,0.5202,800.0000,0.1013
+RandomForest,income,ThresholdOptimizer,Low income,0.4822,0.6667,0.4323,197.0000,0.2132
+RandomForest,income,ThresholdOptimizer,Near poverty,0.6596,0.8182,0.6111,94.0000,0.2340
+RandomForest,income,Suppression,Above threshold,0.0712,0.2593,0.0501,800.0000,0.1013
+RandomForest,income,Suppression,Low income,0.2741,0.3810,0.2452,197.0000,0.2132
+RandomForest,income,Suppression,Near poverty,0.1915,0.3636,0.1389,94.0000,0.2340
+RandomForest,race,Baseline,Asian,0.0000,0.0000,0.0000,54.0000,0.1111
+RandomForest,race,Baseline,Black,0.2366,0.4500,0.1982,131.0000,0.1527
+RandomForest,race,Baseline,Hispanic,0.1503,0.3226,0.1127,173.0000,0.1792
+RandomForest,race,Baseline,Other Race,0.2090,0.3000,0.1930,67.0000,0.1493
+RandomForest,race,Baseline,White,0.0901,0.2821,0.0646,666.0000,0.1171
+RandomForest,race,Reweighing,Asian,0.0000,0.0000,0.0000,54.0000,0.1111
+RandomForest,race,Reweighing,Black,0.2290,0.4500,0.1892,131.0000,0.1527
+RandomForest,race,Reweighing,Hispanic,0.1156,0.2581,0.0845,173.0000,0.1792
+RandomForest,race,Reweighing,Other Race,0.2090,0.3000,0.1930,67.0000,0.1493
+RandomForest,race,Reweighing,White,0.1021,0.3590,0.0680,666.0000,0.1171
+RandomForest,race,ExponentiatedGradient,Asian,0.0185,0.0000,0.0208,54.0000,0.1111
+RandomForest,race,ExponentiatedGradient,Black,0.1145,0.0500,0.1261,131.0000,0.1527
+RandomForest,race,ExponentiatedGradient,Hispanic,0.1040,0.2258,0.0775,173.0000,0.1792
+RandomForest,race,ExponentiatedGradient,Other Race,0.1343,0.3000,0.1053,67.0000,0.1493
+RandomForest,race,ExponentiatedGradient,White,0.0976,0.3077,0.0697,666.0000,0.1171
+RandomForest,race,ThresholdOptimizer,Asian,0.4630,0.3333,0.4792,54.0000,0.1111
+RandomForest,race,ThresholdOptimizer,Black,0.3664,0.5000,0.3423,131.0000,0.1527
+RandomForest,race,ThresholdOptimizer,Hispanic,0.4046,0.5806,0.3662,173.0000,0.1792
+RandomForest,race,ThresholdOptimizer,Other Race,0.4030,0.6000,0.3684,67.0000,0.1493
+RandomForest,race,ThresholdOptimizer,White,0.3754,0.6667,0.3367,666.0000,0.1171
+RandomForest,race,Suppression,Asian,0.0185,0.0000,0.0208,54.0000,0.1111
+RandomForest,race,Suppression,Black,0.2519,0.5000,0.2072,131.0000,0.1527
+RandomForest,race,Suppression,Hispanic,0.1503,0.2903,0.1197,173.0000,0.1792
+RandomForest,race,Suppression,Other Race,0.1791,0.3000,0.1579,67.0000,0.1493
+RandomForest,race,Suppression,White,0.0886,0.2692,0.0646,666.0000,0.1171
+XGB,gender,Baseline,Female,0.3403,0.6633,0.2797,620.0000,0.1581
+XGB,gender,Baseline,Male,0.2675,0.5319,0.2382,471.0000,0.0998
+XGB,gender,Reweighing,Female,0.2968,0.6327,0.2337,620.0000,0.1581
+XGB,gender,Reweighing,Male,0.3248,0.6170,0.2925,471.0000,0.0998
+XGB,gender,ExponentiatedGradient,Female,0.3097,0.6429,0.2471,620.0000,0.1581
+XGB,gender,ExponentiatedGradient,Male,0.2866,0.5745,0.2547,471.0000,0.0998
+XGB,gender,ThresholdOptimizer,Female,0.3226,0.6531,0.2605,620.0000,0.1581
+XGB,gender,ThresholdOptimizer,Male,0.3121,0.5319,0.2877,471.0000,0.0998
+XGB,gender,Suppression,Female,0.3113,0.6429,0.2490,620.0000,0.1581
+XGB,gender,Suppression,Male,0.3206,0.5957,0.2901,471.0000,0.0998
+XGB,income,Baseline,Above threshold,0.1888,0.4568,0.1586,800.0000,0.1013
+XGB,income,Baseline,Low income,0.6650,0.8810,0.6065,197.0000,0.2132
+XGB,income,Baseline,Near poverty,0.5851,0.7273,0.5417,94.0000,0.2340
+XGB,income,Reweighing,Above threshold,0.2687,0.5556,0.2364,800.0000,0.1013
+XGB,income,Reweighing,Low income,0.4619,0.6190,0.4194,197.0000,0.2132
+XGB,income,Reweighing,Near poverty,0.4362,0.6364,0.3750,94.0000,0.2340
+XGB,income,ExponentiatedGradient,Above threshold,0.3975,0.5926,0.3755,800.0000,0.1013
+XGB,income,ExponentiatedGradient,Low income,0.4365,0.5476,0.4065,197.0000,0.2132
+XGB,income,ExponentiatedGradient,Near poverty,0.4468,0.5000,0.4306,94.0000,0.2340
+XGB,income,ThresholdOptimizer,Above threshold,0.3513,0.4568,0.3394,800.0000,0.1013
+XGB,income,ThresholdOptimizer,Low income,0.3198,0.4048,0.2968,197.0000,0.2132
+XGB,income,ThresholdOptimizer,Near poverty,0.4681,0.6364,0.4167,94.0000,0.2340
+XGB,income,Suppression,Above threshold,0.2213,0.5556,0.1836,800.0000,0.1013
+XGB,income,Suppression,Low income,0.5990,0.8333,0.5355,197.0000,0.2132
+XGB,income,Suppression,Near poverty,0.4894,0.6818,0.4306,94.0000,0.2340
+XGB,race,Baseline,Asian,0.0556,0.0000,0.0625,54.0000,0.1111
+XGB,race,Baseline,Black,0.4122,0.6500,0.3694,131.0000,0.1527
+XGB,race,Baseline,Hispanic,0.4393,0.6774,0.3873,173.0000,0.1792
+XGB,race,Baseline,Other Race,0.4179,0.5000,0.4035,67.0000,0.1493
+XGB,race,Baseline,White,0.2643,0.6538,0.2126,666.0000,0.1171
+XGB,race,Reweighing,Asian,0.0370,0.0000,0.0417,54.0000,0.1111
+XGB,race,Reweighing,Black,0.3817,0.6000,0.3423,131.0000,0.1527
+XGB,race,Reweighing,Hispanic,0.4104,0.6452,0.3592,173.0000,0.1792
+XGB,race,Reweighing,Other Race,0.4328,0.6000,0.4035,67.0000,0.1493
+XGB,race,Reweighing,White,0.2733,0.6667,0.2211,666.0000,0.1171
+XGB,race,ExponentiatedGradient,Asian,0.2593,0.0000,0.2917,54.0000,0.1111
+XGB,race,ExponentiatedGradient,Black,0.2824,0.3000,0.2793,131.0000,0.1527
+XGB,race,ExponentiatedGradient,Hispanic,0.3526,0.5806,0.3028,173.0000,0.1792
+XGB,race,ExponentiatedGradient,Other Race,0.2836,0.4000,0.2632,67.0000,0.1493
+XGB,race,ExponentiatedGradient,White,0.2988,0.6282,0.2551,666.0000,0.1171
+XGB,race,ThresholdOptimizer,Asian,0.4074,0.1667,0.4375,54.0000,0.1111
+XGB,race,ThresholdOptimizer,Black,0.4122,0.4500,0.4054,131.0000,0.1527
+XGB,race,ThresholdOptimizer,Hispanic,0.4220,0.5806,0.3873,173.0000,0.1792
+XGB,race,ThresholdOptimizer,Other Race,0.4179,0.8000,0.3509,67.0000,0.1493
+XGB,race,ThresholdOptimizer,White,0.3979,0.7179,0.3554,666.0000,0.1171
+XGB,race,Suppression,Asian,0.3519,0.1667,0.3750,54.0000,0.1111
+XGB,race,Suppression,Black,0.5267,0.8500,0.4685,131.0000,0.1527
+XGB,race,Suppression,Hispanic,0.4393,0.7419,0.3732,173.0000,0.1792
+XGB,race,Suppression,Other Race,0.4030,0.5000,0.3860,67.0000,0.1493
+XGB,race,Suppression,White,0.2492,0.6538,0.1956,666.0000,0.1171

@@ -124,6 +124,16 @@ SENS_COL_DICT = {
     ],
 }
 
+def _append_detail(detail_rows, details_df, model_name, attr_name, method):
+    for group_name, row in details_df.iterrows():
+        detail_rows.append({
+            "model": model_name,
+            "sensitive_attr": attr_name,
+            "miti_method": method,
+            "group": group_name,
+            **row.to_dict(),
+        })
+
 
 # 3 models, 3 sensitive features, 4 mitigation method +  1 baseline, got 45 records.
 def run_all_mitigations() -> list[dict]:
@@ -146,6 +156,7 @@ def run_all_mitigations() -> list[dict]:
     sensitive_test_df = extract_sensitive_attrs(X_test)
 
     all_results = []
+    detail_rows = []
 
     for name, pipe in Baseline_models.items():
         y_pred_base = pipe.predict(X_test)
@@ -158,6 +169,7 @@ def run_all_mitigations() -> list[dict]:
             fairness_summary_base, fairness_details_base = _get_model_fairness_eval(
                 y_test, y_pred_base, sens_test
             )
+            _append_detail(detail_rows, fairness_details_base, name, col, "Baseline")
             # 1. Baseline model performance and fairness evaluation
             all_results.append(
                 _build_row(
@@ -174,9 +186,10 @@ def run_all_mitigations() -> list[dict]:
             y_pred_rw = rw_model.predict(X_test)
             y_proba_rw = rw_model.predict_proba(X_test)[:, 1]
             performance_rw = _get_model_performance(y_test, y_pred_rw, y_proba_rw)
-            fairness_summary_rw, _ = _get_model_fairness_eval(
+            fairness_summary_rw, fairness_details_rw = _get_model_fairness_eval(
                 y_test, y_pred_rw, sens_test
             )
+            _append_detail(detail_rows, fairness_details_rw, name, col, "Reweighing")
             all_results.append(
                 _build_row(name, col, "Reweighing", performance_rw, fairness_summary_rw)
             )
@@ -191,9 +204,10 @@ def run_all_mitigations() -> list[dict]:
             y_pred_exg = exg_model.predict(X_test, random_state=42)
 
             performance_exg = _get_model_performance(y_test, y_pred_exg)
-            fairness_summary_exg, _ = _get_model_fairness_eval(
+            fairness_summary_exg, fairness_details_exg = _get_model_fairness_eval(
                 y_test, y_pred_exg, sens_test
             )
+            _append_detail(detail_rows, fairness_details_exg, name, col, "ExponentiatedGradient")
             all_results.append(
                 _build_row(
                     name,
@@ -215,10 +229,10 @@ def run_all_mitigations() -> list[dict]:
             )
             # thresholdOptimizer do nothing with probability, but threshold, so probability same as baseline
             performance_to = _get_model_performance(y_test, y_pred_to)
-            fairness_summary_to, _ = _get_model_fairness_eval(
+            fairness_summary_to, fairness_details_to = _get_model_fairness_eval(
                 y_test, y_pred_to, sens_test
             )
-
+            _append_detail(detail_rows, fairness_details_to, name, col, "ThresholdOptimizer")
             all_results.append(
                 _build_row(
                     name,
@@ -239,14 +253,17 @@ def run_all_mitigations() -> list[dict]:
             y_pred_sup = sup_model.predict(X_test_reduced)
             y_proba_sup = sup_model.predict_proba(X_test_reduced)[:, 1]
             performance_sup = _get_model_performance(y_test, y_pred_sup, y_proba_sup)
-            fairness_summary_sup, _ = _get_model_fairness_eval(
+            fairness_summary_sup, fairness_details_sup = _get_model_fairness_eval(
                 y_test, y_pred_sup, sens_test
             )
+            _append_detail(detail_rows, fairness_details_sup, name, col, "Suppression")
             all_results.append(
                 _build_row(
                     name, col, "Suppression", performance_sup, fairness_summary_sup
                 )
             )
+    detail_df = pd.DataFrame(detail_rows)
+    detail_df.to_csv(RESULTS_DIR / "nhanes_mitigation_detail.csv", index=False, float_format="%.4f")
     save_mitigation_results(pd.DataFrame(all_results))
     return all_results
 
@@ -274,6 +291,7 @@ def save_mitigation_results(df: pd.DataFrame):
     df.to_csv(path, index=False, float_format="%.4f")
     print(f"\nMitigation results saved -> {path}")
     print(df.to_string(index=False))
+
 
 
 """

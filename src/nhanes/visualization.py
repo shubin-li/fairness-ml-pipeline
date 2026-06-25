@@ -25,6 +25,7 @@ cv_df = pd.read_csv(RESULTS_DIR / "nhanes_baseline_cv.csv")
 test_df = pd.read_csv(RESULTS_DIR / "nhanes_baseline_test.csv")
 detail_df = pd.read_csv(RESULTS_DIR / "nhanes_fairness_baseline_detail.csv")
 summary_df = pd.read_csv(RESULTS_DIR / "nhanes_fairness_baseline_summary.csv")
+mit_detail_df = pd.read_csv(RESULTS_DIR / "nhanes_mitigation_detail.csv")
 
 # config
 
@@ -635,6 +636,66 @@ def r6_disparity_reduction():
 
 
 # fig8
+"""
+figure 8: F1 vs Equal Opportunity Tradeoff Scatter ( RQ3)
+
+x = F1-Score, y = EOpp Difference
+3 panels: Gender / Income / Race
+red × = degenerate model (recall < 0.05, all-negative predictions)
+red dashed line = 0.1 fairness threshold
+
+Why F1 not Accuracy on x-axis?
+Class imbalance (~13% positive). Accuracy is dominated by majority class,
+so a recall-collapsed model (predict all negative) gets accuracy=0.87
+and lands in the "ideal" bottom-right corner. F1 correctly puts it at
+the left (F1=0) because F1 penalizes zero recall.
+
+Ideal region: bottom-right (high F1 + low disparity)
+Below baseline = more fair. Left of baseline = performance cost.
+
+Gender panel:
+1. all 15 points squeezed in F1≈0.31-0.38, EOpp≈0.01-0.17
+   → tight cluster, small range both axes
+2. most mitigation points sit BELOW baseline AND keep similar F1
+   → essentially free lunch, no real tradeoff
+3. no single method dominates — RW/EG/TO/Supp all have winners
+   → gender bias is shallow, method-agnostic to fix
+
+Income panel:
+1. ★ DEGENERATE POINT bottom-left: LR+income+EG, F1=0, EOpp=0
+   → false fairness. model predicts all negative, recall=0.
+   trivially zero disparity because no one gets predicted positive.
+   THIS is why we use F1 not Accuracy — Accuracy would put this at 0.87.
+2. baselines cluster at top (EOpp 0.28-0.47), mitigation pulls down
+   but costs F1: e.g. LR+TO drops EOpp 0.47→0.07 but F1 0.35→0.29
+   XGB+RW drops EOpp 0.42→0.08, F1 only 0.37→0.35 (cheaper)
+   → tradeoff exists, but cost varies by model×method
+3. Suppression (purple): all 3 models move down (EOpp drops 0.12-0.16)
+   with no F1 cost — partial improvement, but still worse than
+   RW/EG/TO which achieve EOpp < 0.10. Suppression reduces income
+   bias but does not solve it.
+Race panel:
+1. ★ ALL points above 0.1 threshold line. most above 0.3, many near 0.7
+   → race EOpp is essentially unmitigable with current methods
+2. XGB+race: all 5 methods stuck at EOpp 0.63-0.68, zero movement
+   → hardest cell in entire 3×3 grid, nothing works
+3. only LR+EG gets close to acceptable (EOpp 0.16) but F1 crashes
+   0.35→0.15 — you pay massive performance for marginal fairness
+4. Suppression backfires on race: RF+Supp EOpp=0.50 > baseline 0.45
+    → removing race feature makes it WORSE (proxy encoding)
+
+Cross-panel patterns:
+1. tradeoff severity: gender ≈ free lunch, income = moderate,
+    race = money can not buy fairness
+2. no universal best method. RW good on gender/income,
+3. Suppression is the worst method overall — never best on income
+    or race, sometimes backfires. confirms naive suppression is not
+    a real mitigation strategy
+4. degenerate model root cause: LR linear capacity too weak to
+    satisfy tight EG fairness constraint when baseline bias is huge
+    (income EOpp≈0.47). not a group-count issue — it is model
+    capacity × constraint tightness × baseline disparity magnitude
+"""
 def f2_tradeoff_f1_EOpp():
     ieee_style()
     markers = {'LogisticRegression':'o','RandomForest':'s','XGB':'^'}
@@ -668,7 +729,242 @@ def f2_tradeoff_f1_EOpp():
     fig.tight_layout(rect=[0,0.08,1,1])
     save(fig, "f2_tradeoff_f1_EOpp")
 
+# TODO:  增加mitigation detail 并作图， 进行cross domain comparison的作图
+METHOD_MARKERS = {
+    "Reweighing": "s",
+    "ExponentiatedGradient": "D",
+    "ThresholdOptimizer": "^",
+    "Suppression": "v",
+}
+ 
+def f3_method_gap_comparison():
+    """All-method EOpp comparison — reads directly from mit_df."""
+    ieee_style()
 
+    gap_rows = []
+    for _, row in mit_df.iterrows():
+        gap_rows.append({
+            "model": row["model"],
+            "attr": row["sensitive_attr"],
+            "method": row["miti_method"],
+            "abs_gap": row["Equal Opportunity"],
+            "degenerate": row["recall"] < 0.05,
+        })
+    gaps = pd.DataFrame(gap_rows)
+
+    fig, axes = plt.subplots(1, 3, figsize=(7.16, 3.2), sharey=True)
+
+    for idx, attr in enumerate(ATTR):
+        ax = axes[idx]
+
+        for mi, model in enumerate(MODEL_ORDER):
+            x_center = mi
+
+            base_gap = gaps[
+                (gaps["attr"] == attr)
+                & (gaps["model"] == model)
+                & (gaps["method"] == "Baseline")
+            ]["abs_gap"].values[0]
+
+            ax.plot(
+                [x_center - 0.35, x_center + 0.35],
+                [base_gap, base_gap],
+                color="#bdc3c7", lw=2.5, zorder=1,
+            )
+
+            offsets = np.linspace(-0.2, 0.2, len(METHOD_MARKERS))
+            for ji, method in enumerate(METHOD_MARKERS.keys()):
+                row = gaps[
+                    (gaps["attr"] == attr)
+                    & (gaps["model"] == model)
+                    & (gaps["method"] == method)
+                ]
+                if len(row) == 0:
+                    continue
+                r = row.iloc[0]
+                xp = x_center + offsets[ji]
+
+                ax.plot(
+                    [xp, xp], [base_gap, r["abs_gap"]],
+                    color=METHOD_COLORS[method], lw=1.2, alpha=0.6, zorder=2,
+                )
+
+                if r["degenerate"]:
+                    ax.scatter(
+                        xp, r["abs_gap"], s=40, facecolors="white",
+                        edgecolors=METHOD_COLORS[method], linewidth=1,
+                        marker=METHOD_MARKERS[method], zorder=4,
+                    )
+                    ax.plot(
+                        xp, r["abs_gap"], "x", color="red",
+                        markersize=5, markeredgewidth=1.2, zorder=5,
+                    )
+                else:
+                    ax.scatter(
+                        xp, r["abs_gap"], s=40, color=METHOD_COLORS[method],
+                        edgecolors="white", linewidth=0.4,
+                        marker=METHOD_MARKERS[method], zorder=4,
+                    )
+
+        ax.axhline(0.1, color="red", ls="--", lw=0.7, alpha=0.5)
+        ax.set_xticks(range(len(MODEL_ORDER)))
+        ax.set_xticklabels([MODEL_SHORT[m] for m in MODEL_ORDER])
+        ax.set_title(ATTR_TITLES[attr])
+        ax.spines[["top", "right"]].set_visible(False)
+        if idx == 0:
+            ax.set_ylabel("TPR Gap (Equal Opportunity Diff.)")
+
+    mh = [Line2D([0], [0], color="#bdc3c7", lw=2.5, label="Baseline")]
+    mh += [
+        Line2D(
+            [0], [0], marker=METHOD_MARKERS[m], color="w",
+            markerfacecolor=METHOD_COLORS[m], markersize=7,
+            label=METHOD_SHORT[m],
+        )
+        for m in METHOD_MARKERS
+    ]
+    mh += [
+        Line2D([0], [0], marker="x", color="red", lw=0,
+               markersize=6, label="degenerate"),
+        Line2D([0], [0], color="red", ls="--", lw=0.7,
+               label="0.1 threshold"),
+    ]
+    fig.legend(
+        handles=mh, loc="lower center", ncol=len(mh),
+        bbox_to_anchor=(0.5, -0.08), fontsize=6.5,
+    )
+    fig.tight_layout(rect=[0, 0.05, 1, 0.98])
+    save(fig, "f3_method_gap_comparison")
+ 
+
+
+from matplotlib.transforms import blended_transform_factory
+
+
+def f4_mit_detail_gap_dumbbell():
+    """
+    Paper RQ3: TPR-span dumbbell, before vs after best mitigation.
+    18 segments = 9 (model × attr) × 2 (baseline + best mitigation).
+
+    Findings:
+    1. Gender: baseline gaps small (0.13–0.17), all close to < 0.06 after
+    2. Income: largest baseline gaps (0.28–0.47), TO/RW reduce well
+    3. Race: most resistant — XGB+EG barely shrinks (0.68→0.63)
+    4. Method diversity: gender/income pick varied methods;
+       race uniformly selects EG yet EG struggles with 5-group disparity
+    """
+    ieee_style()
+
+    # ── best method per model × attr (lowest EOpp, recall ≥ 0.05) ──
+    recs = []
+    for attr in ATTR:
+        for model in MODEL_ORDER:
+            cands = mit_df.query(
+                "model == @model and sensitive_attr == @attr "
+                "and miti_method != 'Baseline' and recall >= 0.05"
+            )
+            if cands.empty:
+                continue
+            method = cands.loc[cands["Equal Opportunity"].idxmin(), "miti_method"]
+
+            bg = mit_detail_df.query(
+                "model == @model and sensitive_attr == @attr "
+                "and miti_method == 'Baseline'"
+            )
+            ag = mit_detail_df.query(
+                "model == @model and sensitive_attr == @attr "
+                "and miti_method == @method"
+            )
+
+            recs.append(dict(
+                model=model, attr=attr, method=method,
+                b_hi=bg["true_positive_rate"].max(),
+                b_lo=bg["true_positive_rate"].min(),
+                a_hi=ag["true_positive_rate"].max(),
+                a_lo=ag["true_positive_rate"].min(),
+            ))
+
+    # ── x positions: 3 attr groups × 3 models, gaps between groups ──
+    GAP = 0.7
+    OFF = 0.14
+    xs, xi = [], 0
+    for ai in range(3):
+        for _ in range(3):
+            xs.append(xi)
+            xi += 1
+        if ai < 2:
+            xi += GAP
+
+    # ── figure ──
+    fig, ax = plt.subplots(figsize=(7.16, 2.6))
+    #   BC = "#b0b0b0"      # baseline gray
+    #   AC = "#27ae60"       # after — uniform green
+    BC = "#c0392b"       # baseline red (problem state)
+    AC = "#2980b9"       # after blue (improved)
+    MS = 3.5
+    LW = 1.8
+
+    for i, r in enumerate(recs):
+        x = xs[i]
+
+        # baseline (left)
+        ax.plot([x - OFF] * 2, [r["b_lo"], r["b_hi"]],
+                color=BC, lw=LW, solid_capstyle="round", zorder=2)
+        ax.plot(x - OFF, r["b_hi"], "o", color=BC, ms=MS, zorder=3)
+        ax.plot(x - OFF, r["b_lo"], "o", color=BC, ms=MS, zorder=3,
+                 mew=1.0)
+        # mfc="white",
+        # after (right)
+        ax.plot([x + OFF] * 2, [r["a_lo"], r["a_hi"]],
+                color=AC, lw=LW, solid_capstyle="round", zorder=2)
+        ax.plot(x + OFF, r["a_hi"], "o", color=AC, ms=MS, zorder=3)
+        ax.plot(x + OFF, r["a_lo"], "o", color=AC, ms=MS, zorder=3,
+                 mew=1.0)
+        # mfc="white",
+    # ── x ticks ──
+    ax.set_xticks(xs)
+    ax.set_xticklabels([
+        f"{MODEL_SHORT[r['model']]}\n({METHOD_SHORT[r['method']]})"
+        for r in recs
+    ])
+
+    # ── attribute group labels above plot ──
+    trans = blended_transform_factory(ax.transData, ax.transAxes)
+    for ai, attr in enumerate(ATTR):
+        gx = xs[ai * 3: ai * 3 + 3]
+        ax.text(np.mean(gx), 1.06, ATTR_TITLES[attr],
+                transform=trans, ha="center", va="bottom",
+                fontsize=9, fontweight="bold")
+
+    # ── dashed separators ──
+    for k in range(2):
+        sx = (xs[k * 3 + 2] + xs[k * 3 + 3]) / 2
+        ax.axvline(sx, color="#dee2e6", ls=":", lw=0.6, zorder=0)
+
+    # ── axes ──
+    ax.set_xlim(xs[0] - 0.5, xs[-1] + 0.5)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_ylabel("True positive rate")
+    ax.spines[["top", "right"]].set_visible(False)
+
+    # ── legend (bottom center) ──
+    h = [
+        Line2D([], [], color=BC, marker="o", ms=MS, lw=LW, label="Baseline"),
+        Line2D([], [], color=AC, marker="o", ms=MS, lw=LW, label="After mitigation"),
+        # Line2D([], [], ls="none", marker="o", ms=MS,
+        #        mfc="#888", mec="#888", label="Best-served"),
+        # Line2D([], [], ls="none", marker="o", ms=MS,
+        #        mfc="white", mec="#888", mew=1.0, label="Worst-served"),
+    ]
+    fig.legend(
+        handles=h, loc="lower center",
+        bbox_to_anchor=(0.5, -0.06),
+        ncol=4, frameon=False, fontsize=7,
+        handletextpad=0.4, columnspacing=1.2,
+    )
+
+    fig.tight_layout(rect=[0, 0.06, 1, 1])
+    save(fig, "f4_mit_detail_gap_dumbbell")
 
 
 if __name__ == "__main__":
@@ -680,3 +976,5 @@ if __name__ == "__main__":
     r5_disparity_reduction()
     r6_disparity_reduction()
     f2_tradeoff_f1_EOpp()
+    f3_method_gap_comparison()
+    f4_mit_detail_gap_dumbbell()
