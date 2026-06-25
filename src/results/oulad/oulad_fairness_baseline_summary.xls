@@ -1,0 +1,10 @@
+model,sensitive_attr,miti_method,accuracy,precision,recall,f1,roc_auc,Demographic Parity,Equal Opportunity,Equalized Odds
+LogisticRegression,gender,Baseline,0.6943,0.6786,0.6692,0.6739,,0.0733,0.0218,0.0982
+RandomForest,gender,Baseline,0.6998,0.6808,0.6854,0.6831,,0.0411,0.0010,0.0567
+XGB,gender,Baseline,0.7145,0.6816,0.7416,0.7104,,0.0772,0.0455,0.0815
+LogisticRegression,region,Baseline,0.6943,0.6786,0.6692,0.6739,,0.2704,0.2316,0.2703
+RandomForest,region,Baseline,0.6998,0.6808,0.6854,0.6831,,0.2292,0.1404,0.1895
+XGB,region,Baseline,0.7145,0.6816,0.7416,0.7104,,0.2378,0.1610,0.1616
+LogisticRegression,age_band,Baseline,0.6943,0.6786,0.6692,0.6739,,0.3151,0.1164,0.4673
+RandomForest,age_band,Baseline,0.6998,0.6808,0.6854,0.6831,,0.3345,0.1438,0.4673
+XGB,age_band,Baseline,0.7145,0.6816,0.7416,0.7104,,0.2674,0.1084,0.3719
