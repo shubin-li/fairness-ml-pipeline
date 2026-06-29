@@ -62,6 +62,7 @@ MODEL_COLORS = ["#2c3e50", "#2980b9", "#e67e22"]
 ATTR = ["gender", "income", "race"]
 ATTR_TITLES = {"gender": "Gender", "income": "Income Group", "race": "Race Group"}
 FAIR_METRICS = ["Demographic Parity", "Equal Opportunity", "Equalized Odds"]
+METRIC_SHORT = {"Demographic Parity": "DP", "Equal Opportunity": "EOpp", "Equalized Odds": "EOdds"}
 
 # group display order
 GROUP_ORDER = {
@@ -1232,11 +1233,10 @@ Key takeaway:
    High variance = not safe to deploy without domain validation.
 4. RW and Supp are near-zero in OULAD — harmless but useless.
 """
-
 def x2_crossdomain_bar():
     ieee_style()
     methods = ["Reweighing", "ExponentiatedGradient", "ThresholdOptimizer", "Suppression"]
- 
+
     def _per_model_reduction(df, attrs, recall_thr=0.05, base_thr=0.05):
         out = {}
         for method in methods:
@@ -1266,82 +1266,352 @@ def x2_crossdomain_bar():
                     model_reds.append(np.mean(attr_reds))
             out[method] = model_reds
         return out
- 
+
     nh = _per_model_reduction(mit_df, ATTR)
     ou = _per_model_reduction(oulad_df, OULAD_ATTR)
- 
-    fig, ax = plt.subplots(figsize=(7.16, 3.0))
+
+    fig, ax = plt.subplots(figsize=(7.16, 3.2))
     x = np.arange(len(methods))
-    w = 0.35
- 
-    for offset, data, label, color in [
+    w = 0.36
+
+    series = [
         (-w / 2, nh, "NHANES (Healthcare)", "#2980b9"),
         (w / 2, ou, "OULAD (Education)", "#e67e22"),
-    ]:
-        means = [np.mean(data[m]) if data[m] else 0 for m in methods]
-        lo = [np.mean(data[m]) - min(data[m]) if len(data[m]) > 1 else 0 for m in methods]
-        hi = [max(data[m]) - np.mean(data[m]) if len(data[m]) > 1 else 0 for m in methods]
- 
-        ax.bar(
-            x + offset, means, w, label=label, color=color,
-            edgecolor="white", linewidth=0.5,
-        )
-        ax.errorbar(
-            x + offset, means, yerr=[lo, hi], fmt="none",
-            ecolor="#333333", capsize=3, capthick=0.8, linewidth=0.8,
-        )
-        for i, v in enumerate(means):
-            if v != 0:
-                sign = "+" if v > 0 else ""
-                vy = v + (3 if v >= 0 else -3)
-                va = "bottom" if v >= 0 else "top"
-                ax.text(
-                    x[i] + offset, vy, f"{sign}{v:.0f}%",
-                    ha="center", va=va, fontsize=7,
-                )
- 
-    ax.axhline(0, color="black", lw=0.6)
+    ]
+
+    # ---- collect all per-bar means and error extents up front ----
+    bars = []  # (xpos, mean, lo, hi, color)
+    for offset, data, label, color in series:
+        for i, m in enumerate(methods):
+            vals = data[m]
+            if not vals:
+                continue
+            mean = np.mean(vals)
+            lo = mean - min(vals) if len(vals) > 1 else 0
+            hi = max(vals) - mean if len(vals) > 1 else 0
+            bars.append((x[i] + offset, mean, lo, hi, color))
+
+    # robust outlier detection via median absolute deviation
+    means_only = sorted(m for _, m, _, _, _ in bars)
+    med = means_only[len(means_only) // 2]
+    mad = sorted(abs(m - med) for m in means_only)[len(means_only) // 2]
+    mad = max(mad, 1.0)
+
+    # a bar mean is an outlier if it sits more than k MADs from the median
+    k = 3.0
+    inliers = [m for m in means_only if abs(m - med) <= k * mad]
+    if not inliers:
+        inliers = means_only
+
+    # axis bounds driven by inliers + their error caps, never by an outlier
+    inlier_tops = [m + hi for _, m, _, hi, _ in bars if m in inliers]
+    inlier_bots = [m - lo for _, m, lo, _, _ in bars if m in inliers]
+    clip_top = max(inlier_tops + [0])
+    clip_bot = min(inlier_bots + [0])
+
+    # headroom for labels
+    pad = (clip_top - clip_bot) * 0.12 + 8
+    y_top = clip_top + pad
+    y_bot = clip_bot - pad if clip_bot < 0 else 0
+
+    for xpos, mean, lo, hi, color in bars:
+        disp = min(max(mean, y_bot), y_top)
+        ax.bar(xpos, disp, w, color=color, zorder=2)
+
+        # only draw error caps that stay on-axis; an off-axis bar is an outlier
+        clipped = mean > y_top or mean < y_bot
+        if not clipped:
+            ax.errorbar(
+                xpos, disp, yerr=[[lo], [hi]], fmt="none",
+                ecolor="#444444", capsize=3, capthick=0.8, linewidth=0.8, zorder=3,
+            )
+            top = mean + hi if mean >= 0 else mean - lo
+            lpad = 2.5 if mean >= 0 else -2.5
+            va = "bottom" if mean >= 0 else "top"
+            sign = "+" if mean > 0 else ""
+            ax.text(
+                xpos, top + lpad, f"{sign}{mean:.0f}%",
+                ha="center", va=va, fontsize=7, zorder=5,
+            )
+        else:
+            # outlier bar runs off-axis: label it in the clear space near zero,
+            # no arrow (the bar visibly punches through the axis already)
+            below = mean < y_bot
+            ylab = 4 if below else y_top - 4
+            ax.text(
+                xpos, ylab, f"{mean:+.0f}%",
+                ha="center", va="bottom" if below else "top",
+                fontsize=7, color="#c0392b", fontweight="bold", zorder=5,
+            )
+
+    # legend proxies (bars drawn individually, so build handles manually)
+    from matplotlib.patches import Patch
+    handles = [Patch(facecolor=c, label=l) for _, _, l, c in series]
+    # loc = "lower left" if clip_bot < 0 else "upper right"
+    # ax.legend(handles=handles, loc=loc, framealpha=0.9, fontsize=7)
+    
+    ax.legend(
+        handles=handles, loc="upper center",
+        bbox_to_anchor=(0.5, -0.14), ncol=2,
+        framealpha=0.9, fontsize=7, frameon=False,
+    )
+
+    ax.axhline(0, color="black", lw=0.7, zorder=1)
     ax.set_xticks(x)
     ax.set_xticklabels([METHOD_SHORT[m] for m in methods])
     ax.set_ylabel("Avg EOpp reduction (%)")
     ax.set_title("Cross-domain mitigation effectiveness")
-    ax.legend(loc="upper right", framealpha=0.9)
+    ax.set_ylim(y_bot, y_top)
     ax.spines[["top", "right"]].set_visible(False)
- 
-    # clip y so the RF+TO outlier does not dominate
-    y_lo = max(
-        min(min(np.mean(d[m]) for m in methods if d[m]) for d in [nh, ou]) - 15,
-        -90,
+    ax.margins(x=0.04)
+
+    ax.text(
+        0.5, -0.30,
+        "Bars = mean across 3 models; error bars = model range. "
+        "Excludes degenerate (recall < 0.05) and near-zero baselines (EOpp < 0.05).",
+        transform=ax.transAxes, ha="center", fontsize=6, color="#666666",
     )
-    ax.set_ylim(y_lo, 85)
- 
-    # annotate clipped bar
-    ou_to_mean = np.mean(ou["ThresholdOptimizer"]) if ou["ThresholdOptimizer"] else 0
-    if ou_to_mean < y_lo:
-        ax.annotate(
-            f"{ou_to_mean:.0f}%\n(RF backfire)",
-            xy=(x[2] + w / 2, y_lo + 2),
-            ha="center", va="bottom", fontsize=6.5,
-            color="#c0392b", fontweight="bold",
-        )
-        ax.annotate(
-            "", xy=(x[2] + w / 2, y_lo),
-            xytext=(x[2] + w / 2, y_lo + 8),
-            arrowprops=dict(arrowstyle="->", color="#c0392b", lw=1.2),
-        )
- 
-    # ax.text(
-    #     0.5, -0.12,
-    #     "Error bars = range across 3 models. "
-    #     "Excludes degenerate (recall < 0.05) and near-zero baselines (EOpp < 0.05)",
-    #     transform=ax.transAxes, ha="center", fontsize=6, color="#666666",
-    # )
     fig.tight_layout()
     save(fig, "x2_crossdomain_bar")
+
+"""
+figure 13 — Gender single-attribute direct comparison
+
+Gender is the only attribute shared between NHANES and OULAD.
+
+Shows absolute EOpp difference (not % reduction) because OULAD RF
+baseline gender EOpp = 0.001 (near zero), making % reduction meaningless.
+
+★ Findings:
+1. NHANES gender baseline is moderate and consistent across models
+   (LR=0.161, RF=0.166, XGB=0.131). All above the 0.1 threshold.
+2. OULAD gender baseline is near-zero for LR (0.0218) and RF (0.001),
+   only XGB shows mild bias (0.045). Gender is not a fairness problem
+   in OULAD — a domain-specific finding.
+3. In NHANES, all four methods reduce gender EOpp below 0.1 for LR.
+   RF and XGB are harder (some methods stay above 0.1).
+4. ★ OULAD RF+TO = 0.245: ThresholdOptimizer on a near-zero-bias baseline
+   creates disparity from nothing. Strongest evidence that mitigation
+   methods should not be applied blindly to low-bias settings.
+"""
+
+def x3_crossdomain_gender():
+    ieee_style()
+    methods = [
+        "Baseline", "Reweighing", "ExponentiatedGradient",
+        "ThresholdOptimizer", "Suppression",
+    ]
+    m_labels = [METHOD_SHORT[m] for m in methods]
  
+    nh_g = mit_df[mit_df["sensitive_attr"] == "gender"].copy()
+    ou_g = oulad_df[oulad_df["sensitive_attr"] == "gender"].copy()
  
+    fig, axes = plt.subplots(1, 3, figsize=(7.16, 2.8), sharey=True)
+ 
+    C_NH = "#2980b9"
+    C_OU = "#e67e22"
+    w = 0.35
+ 
+    for idx, model in enumerate(MODEL_ORDER):
+        ax = axes[idx]
+        nh_m = nh_g[nh_g["model"] == model]
+        ou_m = ou_g[ou_g["model"] == model]
+ 
+        x = np.arange(len(methods))
+        nh_vals, ou_vals = [], []
+        for method in methods:
+            nh_row = nh_m[nh_m["miti_method"] == method]
+            ou_row = ou_m[ou_m["miti_method"] == method]
+            nh_vals.append(
+                nh_row["Equal Opportunity"].values[0] if len(nh_row) else np.nan
+            )
+            ou_vals.append(
+                ou_row["Equal Opportunity"].values[0] if len(ou_row) else np.nan
+            )
+ 
+        ax.bar(x - w / 2, nh_vals, w, color=C_NH, edgecolor="white", linewidth=0.5)
+        ax.bar(x + w / 2, ou_vals, w, color=C_OU, edgecolor="white", linewidth=0.5)
+ 
+        # Value labels — compact format for small values
+        for i in range(len(methods)):
+            nv, ov = nh_vals[i], ou_vals[i]
+            if not np.isnan(nv):
+                label = f".{int(nv * 1000):03d}" if nv < 0.1 else f"{nv:.2f}"
+                ax.text(
+                    x[i] - w / 2, nv + 0.006, label,
+                    ha="center", va="bottom", fontsize=5.5, color=C_NH,
+                )
+            if not np.isnan(ov):
+                label = f".{int(ov * 1000):03d}" if ov < 0.1 else f"{ov:.2f}"
+                ax.text(
+                    x[i] + w / 2, ov + 0.006, label,
+                    ha="center", va="bottom", fontsize=5.5, color=C_OU,
+                )
+ 
+        ax.set_xticks(x)
+        ax.set_xticklabels(m_labels, fontsize=7)
+        ax.set_title(MODEL_SHORT[model])
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.axhline(0.1, color="grey", ls="--", lw=0.7, alpha=0.5)
+        if idx == 0:
+            ax.set_ylabel("Equal Opportunity Difference")
+ 
+    # Flag OULAD RF near-zero baseline → TO backfire
+    # ou_rf_base = ou_g[
+    #     (ou_g["model"] == "RandomForest") & (ou_g["miti_method"] == "Baseline")
+    # ]["Equal Opportunity"].values[0]
+    # if ou_rf_base < 0.01:
+    #     axes[1].annotate(
+    #         f"OULAD baseline ≈ {ou_rf_base:.4f}\n(near zero → TO backfires)",
+    #         xy=(3 + w / 2, 0.245),
+    #         xytext=(1.5, 0.22),
+    #         fontsize=5.5, color="#c0392b", style="italic",
+    #         arrowprops=dict(arrowstyle="->", color="#c0392b", lw=0.8),
+    #         bbox=dict(
+    #             boxstyle="round,pad=0.3", facecolor="#fff3f3",
+    #             edgecolor="#c0392b", alpha=0.8,
+    #         ),
+    #     )
+ 
+    handles = [
+        Patch(facecolor=C_NH, label="NHANES (Healthcare)"),
+        Patch(facecolor=C_OU, label="OULAD (Education)"),
+    ]
+    fig.legend(
+        handles=handles, loc="lower center", bbox_to_anchor=(0.5, -0.06),
+        ncol=2, fontsize=7.5, frameon=False,
+    )
+    fig.suptitle(
+        "Cross-Domain Gender Comparison: EOpp per Model × Method",
+        y=1.02, fontsize=10,
+    )
+    fig.tight_layout(rect=[0, 0.02, 1, 0.97])
+    save(fig, "x3_crossdomain_gender")
 
 
+"""
+figure 14 — Cross-domain reduction matrix heatmap
+
+Layout: two panels (NHANES | OULAD), each 4 rows (methods) × 3 cols ( fairness metrics: DP, EOpp, EOdds)
+Cell = mean % disparity reduction across all valid model × attr combos
+       (positive = disparity reduced, negative = backfire)
+
+Filters (applied per model × attr before averaging):
+  recall < 0.05 → degenerate, excluded
+  baseline metric < 0.05 → near-zero baseline, % reduction unstable, excluded
+
+★ Findings:
+NHANES:
+1. All 12 cells positive (+28% to +75%). Every method reduces every metric.
+   EG and TO strongest (DP +75% / +70%); RW and Supp lower but still positive.
+2. DP is the easiest metric to reduce (RW +43%, EG +75%, TO +70%).
+   EOpp/EOdds harder (Supp drops to +34% / +28%).
+
+OULAD:
+1. EG is the only consistently positive row (+23% to +74%).
+   RW and Supp hover near zero (-5% to +8%) — mild baseline bias, little to fix.
+2. ★ TO splits by metric: DP +56% (good), but EOpp -77% and EOdds -18% (worse).
+  TO only adjusts thresholds, so it can equalize selection rates across groups
+  (fixes DP) but ends up making error rates more unequal (hurts EOpp/EOdds).
+  You cannot win on both at once
+
+Cross-domain:
+1. EG is the only method that transfers across both domains and all metrics.
+2. DP is universally easier to reduce than EOpp/EOdds in both domains.
+3. Methods that work in the high-bias setting (NHANES) do not safely transfer
+   to the low-bias setting (OULAD). RW and Supp go near-zero; TO backfires on
+   error-rate metrics.
+"""
+
+def x4_crossdomain_reduction_matrix():
+    ieee_style()
+    methods = ["Reweighing", "ExponentiatedGradient", "ThresholdOptimizer", "Suppression"]
+    m_short = [METHOD_SHORT[m] for m in methods]
+
+    def _mean_reduction_matrix(df, attrs, recall_thr=0.05, base_thr=0.05):
+        """methods × metrics matrix of mean % reduction across model × attr."""
+        mat = np.full((len(methods), len(FAIR_METRICS)), np.nan)
+        for ci, metric in enumerate(FAIR_METRICS):
+            for ri, method in enumerate(methods):
+                reds = []
+                for model in MODEL_ORDER:
+                    for attr in attrs:
+                        base = df[
+                            (df["model"] == model)
+                            & (df["sensitive_attr"] == attr)
+                            & (df["miti_method"] == "Baseline")
+                        ]
+                        meth = df[
+                            (df["model"] == model)
+                            & (df["sensitive_attr"] == attr)
+                            & (df["miti_method"] == method)
+                        ]
+                        if len(base) == 0 or len(meth) == 0:
+                            continue
+                        base_val = base[metric].values[0]
+                        meth_val = meth[metric].values[0]
+                        meth_recall = meth["recall"].values[0]
+                        if meth_recall < recall_thr:
+                            continue
+                        if base_val < base_thr:
+                            continue
+                        reds.append((base_val - meth_val) / base_val * 100)
+                if reds:
+                    mat[ri, ci] = np.mean(reds)
+        return mat
+
+    nh_mat = _mean_reduction_matrix(mit_df, ATTR)
+    ou_mat = _mean_reduction_matrix(oulad_df, OULAD_ATTR)
+
+    fig, axes = plt.subplots(
+        1, 2, figsize=(7.16, 2.8), sharey=True,
+        gridspec_kw={"wspace": 0.08, "right": 0.88},
+    )
+
+    CLIP = 100  # color scale range; raw value still shown in annotation
+    metric_labels = [METRIC_SHORT[m] for m in FAIR_METRICS]
+
+    for ax, mat, title in [
+        (axes[0], nh_mat, "NHANES (Healthcare)"),
+        (axes[1], ou_mat, "OULAD (Education)"),
+    ]:
+        display = np.clip(mat, -CLIP, CLIP)
+        masked = np.ma.masked_invalid(display)
+        im = ax.imshow(masked, cmap="viridis", vmin=-CLIP, vmax=CLIP, aspect="auto")
+
+        for ri in range(len(methods)):
+            for ci in range(len(FAIR_METRICS)):
+                if np.isnan(mat[ri, ci]):
+                    ax.text(
+                        ci, ri, "—", ha="center", va="center",
+                        fontsize=7, color="#bbbbbb",
+                    )
+                else:
+                    v = mat[ri, ci]
+                    abs_v = min(abs(v), CLIP)
+                    color = "white" if abs_v > CLIP * 0.55 else "black"
+                    sign = "+" if v > 0 else ""
+                    ax.text(
+                        ci, ri, f"{sign}{v:.0f}%", ha="center", va="center",
+                        fontsize=7.5,
+                        fontweight="bold" if abs(v) > 100 else "normal",
+                        color=color,
+                    )
+
+        ax.set_xticks(range(len(FAIR_METRICS)))
+        ax.set_xticklabels(metric_labels)
+        ax.set_title(title, fontsize=9, pad=6)
+        ax.tick_params(length=0)
+
+    axes[0].set_yticks(range(len(methods)))
+    axes[0].set_yticklabels(m_short)
+
+    cax = fig.add_axes([0.90, 0.18, 0.015, 0.65])
+    cbar = fig.colorbar(im, cax=cax)
+    cbar.set_label("Disparity reduction (%)", fontsize=7.5, labelpad=4)
+    cbar.ax.tick_params(labelsize=7)
+
+    save(fig, "x4_crossdomain_reduction_matrix")
 
 
 if __name__ == "__main__":
@@ -1357,4 +1627,5 @@ if __name__ == "__main__":
     f4_mit_detail_gap_dumbbell()
     x1_crossdomain_heatmap()
     x2_crossdomain_bar()
-    
+    x3_crossdomain_gender()
+    x4_crossdomain_reduction_matrix()
