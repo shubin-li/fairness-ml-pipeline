@@ -1046,17 +1046,9 @@ def f4_mit_detail_gap_dumbbell():
 
 
 # Cross-domain code
-# ═══════════════════════════════════════════════════════════════════════════
 # Shared helper: compute % EOpp reduction per (model, method)
-# averaged across valid attributes.
 # Filters: recall < 0.05 (degenerate), baseline EOpp < 0.05 (unstable %)
-# ═══════════════════════════════════════════════════════════════════════════
 def _eopp_reduction_matrix(df, attrs, recall_thr=0.05, base_thr=0.05):
-    """
-    Returns:
-        mat: (4 methods × 3 models) array of avg % reduction, NaN where no valid attr
-        degen: same shape, True where ALL valid attrs were degenerate
-    """
     methods = ["Reweighing", "ExponentiatedGradient", "ThresholdOptimizer", "Suppression"]
     mat = np.full((len(methods), len(MODEL_ORDER)), np.nan)
     mask_degen = np.zeros_like(mat, dtype=bool)
@@ -1093,12 +1085,58 @@ def _eopp_reduction_matrix(df, attrs, recall_thr=0.05, base_thr=0.05):
     return mat, mask_degen
  
  
-# ═══════════════════════════════════════════════════════════════════════════
-# [CROSSDOMAIN] X1 — Side-by-side heatmap: % EOpp reduction
-#
-# Best for PAPER. Shows per-model × per-method granularity.
-# Color scale clipped to ±100% so outliers (RF+TO = -236%) stay readable.
-# ═══════════════════════════════════════════════════════════════════════════
+
+"""
+figure 11: Cross-Domain Heatmap — % EOpp Reduction per Model × Method
+
+Each cell = mean % EOpp reduction across sensitive attributes for that model+method combo.
+Positive = improvement (green/yellow), negative = backfire (dark purple).
+Baseline EOpp < 0.05 attributes skipped (nothing to reduce).
+Degenerate models (recall < 0.05) excluded and marked ×.
+
+★ NHANES all positive (every cell +20% or above).
+  OULAD mixed: only EG consistently positive, other 3 methods near-zero or backfire.
+
+# NHANES(left panel):
+2. LR benefits most: EG +76%, TO +74%, RW +53%
+   → linear boundary is easiest to constrain/adjust
+3. EG has the highest floor (+40%) and ceiling (+76%)
+   → strongest single method, but variable across models (range 36pp)
+4. Suppression most stable across models (range only 7pp) but lowest ceiling (+39%)
+   → helps everywhere, solves nowhere
+5. TO most variable: LR +74% vs XGB +20% (range 54pp)
+   → highly dependent on base model, not blindly transferable   
+
+
+OULAD (right panel):
+1. RW: all three models negative (-3%, -9%, -4%)
+   → reweighing consistently backfires in education domain.
+   OULAD baseline bias is already mild, reweighing overshoots
+2. EG: the only method with meaningful positive numbers
+   (LR +33%, RF +31%), but XGB only +4%
+   → in-processing constraint is the only thing that transfers
+3. ★ RF+TO = -236%. catastrophic backfire.
+   this is the single most extreme cell in the entire figure.
+   ThresholdOptimizer on RF amplifies disparity instead of reducing it.
+4. Suppression: mixed bag (LR +6%, RF -15%, XGB +14%)
+   → no clear direction, confirms suppression is unreliable
+
+Cross-domain patterns:
+1. ★ the two domains have fundamentally different fairness landscapes.
+   NHANES has deep structural bias (race EOpp up to 0.68, income 0.47)
+   that methods can meaningfully reduce.
+   OULAD has mild baseline bias — mitigation methods often overshoot
+   or have nothing meaningful to fix, leading to near-zero or negative results.
+2. EG is the only method that works in both domains.
+   RW transfers worst (strong in NHANES, backfires in OULAD).
+   TO is domain-dependent and unstable (strong in NHANES, catastrophic on OULAD RF).
+3. RF is the problematic model in OULAD: TO -236%, Supp -15%, RW -9%.
+   only EG (+31%) saves it. in NHANES, RF is middle-of-the-road, no disasters.
+   → same model, opposite behavior across domains
+4. practical takeaway: mitigation methods designed for high-bias settings
+   (healthcare) do not safely transfer to low-bias settings (education).
+   applying them blindly can make fairness worse, not better.
+"""
 def x1_crossdomain_heatmap():
     ieee_style()
     methods = ["Reweighing", "ExponentiatedGradient", "ThresholdOptimizer", "Suppression"]
@@ -1159,23 +1197,42 @@ def x1_crossdomain_heatmap():
     cbar.set_label("EOpp reduction (%)", fontsize=7.5, labelpad=4)
     cbar.ax.tick_params(labelsize=7)
  
-    fig.text(
-        0.44, 0.01,
-        "× = degenerate (recall < 0.05)     — = baseline EOpp < 0.05",
-        ha="center", fontsize=6.5, color="#666666",
-    )
+    # fig.text(
+    #     0.44, 0.01,
+    #     "× = degenerate (recall < 0.05)     — = baseline EOpp < 0.05",
+    #     ha="center", fontsize=6.5, color="#666666",
+    # )
     save(fig, "x1_crossdomain_heatmap")
  
 
 
 
+"""
+figure 12: Cross-Domain Bar Chart — Avg EOpp Reduction per Method
 
-# ═══════════════════════════════════════════════════════════════════════════
-# [CROSSDOMAIN] X2 — Grouped bar: avg % EOpp reduction per method
-#
-# Best for PPT / viva. Simpler aggregate view.
-# Error bars = range across 3 models.
-# ═══════════════════════════════════════════════════════════════════════════
+Each bar = average % EOpp reduction across 3 models × 3 sensitive attrs,
+for one mitigation method in one domain.
+Error bars = std across model×attribute combos (shows variability).
+Positive bar = method reduced bias on average. Negative = made it worse.
+Degenerate cases (recall < 0.05) excluded before averaging.
+
+★ NHANES (blue): all four methods positive (+34% to +54%).
+  EG best (+54%), RW close behind (+49%), TO and Supp lower but still solid.
+  All error bars moderate — methods work fairly consistently.
+
+★ OULAD (orange): only EG positive (+23%), everything else near-zero or negative.
+  TO = -77%, driven by RF+TO catastrophic backfire (-236%).
+  RW = -5%, Supp = +2% — basically no effect or slight harm.
+
+Key takeaway:
+1. EG is the only method that transfers across domains.
+2. NHANES has deep bias → methods have room to improve.
+   OULAD has mild bias → methods overshoot or have nothing to fix.
+3. TO is the riskiest method: best-case +43% (NHANES), worst-case -77% (OULAD).
+   High variance = not safe to deploy without domain validation.
+4. RW and Supp are near-zero in OULAD — harmless but useless.
+"""
+
 def x2_crossdomain_bar():
     ieee_style()
     methods = ["Reweighing", "ExponentiatedGradient", "ThresholdOptimizer", "Suppression"]
@@ -1248,7 +1305,7 @@ def x2_crossdomain_bar():
     ax.set_xticklabels([METHOD_SHORT[m] for m in methods])
     ax.set_ylabel("Avg EOpp reduction (%)")
     ax.set_title("Cross-domain mitigation effectiveness")
-    ax.legend(loc="upper left", framealpha=0.9)
+    ax.legend(loc="upper right", framealpha=0.9)
     ax.spines[["top", "right"]].set_visible(False)
  
     # clip y so the RF+TO outlier does not dominate
@@ -1273,112 +1330,17 @@ def x2_crossdomain_bar():
             arrowprops=dict(arrowstyle="->", color="#c0392b", lw=1.2),
         )
  
-    ax.text(
-        0.5, -0.12,
-        "Error bars = range across 3 models. "
-        "Excludes degenerate (recall < 0.05) and near-zero baselines (EOpp < 0.05)",
-        transform=ax.transAxes, ha="center", fontsize=6, color="#666666",
-    )
+    # ax.text(
+    #     0.5, -0.12,
+    #     "Error bars = range across 3 models. "
+    #     "Excludes degenerate (recall < 0.05) and near-zero baselines (EOpp < 0.05)",
+    #     transform=ax.transAxes, ha="center", fontsize=6, color="#666666",
+    # )
     fig.tight_layout()
     save(fig, "x2_crossdomain_bar")
  
  
-# ═══════════════════════════════════════════════════════════════════════════
-# [CROSSDOMAIN] X3 — Dumbbell: absolute EOpp baseline → best mitigation
-#
-# Complementary view showing raw disparity levels across domains.
-# Answers: "How hard is each domain to mitigate?"
-# ═══════════════════════════════════════════════════════════════════════════
-def x3_crossdomain_dumbbell():
-    ieee_style()
- 
-    def _best_per_model(df, attrs, recall_thr=0.05):
-        records = []
-        for model in MODEL_ORDER:
-            base_vals, best_vals = [], []
-            for attr in attrs:
-                sub = df[(df["model"] == model) & (df["sensitive_attr"] == attr)]
-                baseline = sub[sub["miti_method"] == "Baseline"]["Equal Opportunity"].values
-                if len(baseline) == 0:
-                    continue
-                base_eopp = baseline[0]
-                base_vals.append(base_eopp)
-                miti = sub[
-                    (sub["miti_method"] != "Baseline") & (sub["recall"] >= recall_thr)
-                ]
-                if len(miti) > 0:
-                    best_idx = miti["Equal Opportunity"].idxmin()
-                    best_vals.append(miti.loc[best_idx, "Equal Opportunity"])
-                else:
-                    best_vals.append(base_eopp)
-            records.append({
-                "model": model,
-                "baseline": np.mean(base_vals),
-                "best": np.mean(best_vals),
-            })
-        return pd.DataFrame(records)
- 
-    nh_best = _best_per_model(mit_df, ATTR)
-    ou_best = _best_per_model(oulad_df, OULAD_ATTR)
- 
-    fig, ax = plt.subplots(figsize=(7.16, 2.8))
- 
-    C_BASE = "#c0392b"
-    C_BEST = "#27ae60"
-    C_NH = "#2980b9"
-    C_OU = "#e67e22"
- 
-    y = 0
-    gap = 0.6
-    for i, model in enumerate(MODEL_ORDER):
-        nh_row = nh_best[nh_best["model"] == model].iloc[0]
-        ou_row = ou_best[ou_best["model"] == model].iloc[0]
- 
-        # OULAD row (bottom of pair)
-        ax.plot(
-            [ou_row["baseline"], ou_row["best"]], [y, y],
-            color="#dddddd", lw=1.5, zorder=1,
-        )
-        ax.scatter(ou_row["baseline"], y, s=50, color=C_BASE, zorder=3,
-                   edgecolor="white", linewidth=0.5)
-        ax.scatter(ou_row["best"], y, s=50, color=C_BEST, zorder=3,
-                   edgecolor="white", linewidth=0.5)
-        ax.text(-0.02, y, f"{MODEL_SHORT[model]} — OULAD", ha="right",
-                va="center", fontsize=7.5, color=C_OU)
-        y += 1
- 
-        # NHANES row (top of pair)
-        ax.plot(
-            [nh_row["baseline"], nh_row["best"]], [y, y],
-            color="#dddddd", lw=1.5, zorder=1,
-        )
-        ax.scatter(nh_row["baseline"], y, s=50, color=C_BASE, zorder=3,
-                   edgecolor="white", linewidth=0.5)
-        ax.scatter(nh_row["best"], y, s=50, color=C_BEST, zorder=3,
-                   edgecolor="white", linewidth=0.5)
-        ax.text(-0.02, y, f"{MODEL_SHORT[model]} — NHANES", ha="right",
-                va="center", fontsize=7.5, color=C_NH)
-        y += gap
- 
-    ax.set_xlim(-0.02, max(nh_best["baseline"].max(), 0.5) + 0.05)
-    ax.set_ylim(-0.5, y - gap + 0.5)
-    ax.set_yticks([])
-    ax.set_xlabel("Average EOpp Difference (across attributes)")
-    ax.set_title("Baseline vs Best Mitigation: NHANES and OULAD")
-    ax.spines[["top", "right", "left"]].set_visible(False)
- 
-    ax.axvline(0.1, color="grey", ls="--", lw=0.8, alpha=0.5)
-    ax.text(0.1, y - gap + 0.3, "0.1", ha="center", fontsize=6.5, color="grey")
- 
-    legend_elements = [
-        Line2D([0], [0], marker="o", color="w", markerfacecolor=C_BASE,
-               markersize=7, label="Baseline"),
-        Line2D([0], [0], marker="o", color="w", markerfacecolor=C_BEST,
-               markersize=7, label="Best mitigation"),
-    ]
-    ax.legend(handles=legend_elements, loc="lower right", fontsize=7, framealpha=0.9)
-    fig.tight_layout()
-    save(fig, "x3_crossdomain_dumbbell")
+
 
 
 
@@ -1395,4 +1357,4 @@ if __name__ == "__main__":
     f4_mit_detail_gap_dumbbell()
     x1_crossdomain_heatmap()
     x2_crossdomain_bar()
-    x3_crossdomain_dumbbell()
+    
