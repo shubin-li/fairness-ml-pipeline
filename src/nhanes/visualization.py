@@ -27,7 +27,10 @@ detail_df = pd.read_csv(RESULTS_DIR / "nhanes_fairness_baseline_detail.csv")
 summary_df = pd.read_csv(RESULTS_DIR / "nhanes_fairness_baseline_summary.csv")
 mit_detail_df = pd.read_csv(RESULTS_DIR / "nhanes_mitigation_detail.csv")
 
-# config
+#oulad data
+oulad_df = pd.read_csv(RESULTS_DIR / ".." / "oulad" / "oulad_mitigation_results__1_.xls")
+
+# nhanes config
 
 # cividis viridis magma
 HEATMAP_CMAP = "cividis"
@@ -67,6 +70,9 @@ GROUP_ORDER = {
     "race": ["Asian", "Black", "Hispanic", "Other Race", "White"],
 }
 
+# OULAD config
+OULAD_ATTR = ["gender", "region", "age_band"]
+OULAD_ATTR_TITLES = {"gender": "Gender", "region": "Region", "age_band": "Age Band"}
 
 def ieee_style():
     plt.rcParams.update(
@@ -729,14 +735,84 @@ def f2_tradeoff_f1_EOpp():
     fig.tight_layout(rect=[0,0.08,1,1])
     save(fig, "f2_tradeoff_f1_EOpp")
 
-# TODO:  增加mitigation detail 并作图， 进行cross domain comparison的作图
+# TODO:  进行cross domain comparison的作图
 METHOD_MARKERS = {
     "Reweighing": "s",
     "ExponentiatedGradient": "D",
     "ThresholdOptimizer": "^",
     "Suppression": "v",
 }
- 
+
+# fig 9
+"""
+figure 9: Method-wise EOpp Gap Comparison (RQ3)
+
+y = Equal Opportunity Difference (TPR gap between worst and best group)
+3 panels: Gender / Income Group / Race Group
+grey bar = baseline, colored markers = 4 mitigation methods
+red × = degenerate (recall < 0.05), red dashed = 0.1 fairness threshold
+
+What this figure answers:
+Which mitigation method reduces EOpp most, per model × attribute?
+Unlike F2 (best-only), this shows ALL 4 methods side by side so you
+can compare method effectiveness directly.
+
+Gender panel:
+1. baseline EOpp is low to begin with (0.13–0.17), all three models
+2. every method pulls below baseline for every model
+   → gender bias is easy to mitigate, all methods work
+3. most points land below 0.1 threshold
+   → gender is essentially "solved" by any method
+4. no clear winner — RW, EG, TO, Supp all achieve EOpp < 0.05
+   in at least one model. method choice barely matters here
+
+Income panel:
+1. ★ LR+EG = red ×, EOpp=0.00 — DEGENERATE. recall=0, F1=0.
+   model predicts all negative. trivially zero disparity.
+   false fairness, not real mitigation.
+2. baselines are high: LR=0.47, RF=0.28, XGB=0.42
+   → income bias is structurally embedded
+3. RW and EG (non-degenerate cases) pull EOpp below 0.10 for
+   RF and XGB — genuine improvement
+4. TO is inconsistent: good on LR (0.47→0.07) but bad on
+   RF (0.28→0.25) and XGB (0.42→0.23) — post-processing
+   struggles when base model already has low recall (RF)
+5. Suppression barely moves the needle: LR 0.47→0.35,
+   XGB 0.42→0.28, RF improves slightly 0.28→0.12
+   → income-correlated proxy features make suppression
+   ineffective. removing the income column does not remove
+   income signal from the data
+
+Race panel:
+1. ★ ALL points above 0.1 except LR+EG (0.16) — race is the
+   hardest attribute to mitigate by a wide margin
+2. XGB+race: all 4 methods stuck at 0.63–0.68, basically
+   equal to baseline 0.68 → nothing works, zero movement
+3. RF+race: RW does nothing (0.45→0.45), EG partial (0.31),
+   TO partial (0.33), Supp makes it WORSE (0.45→0.50)
+4. LR+race: EG is the only method that gets close (0.64→0.16)
+   but at massive F1 cost (0.35→0.15) — check F2 for the
+   performance tradeoff
+5. Suppression backfires: RF 0.45→0.50, XGB 0.68→0.68
+   → race feature removal activates proxy encoding,
+   model reconstructs race signal from correlated features
+
+Cross-panel takeaways:
+1. difficulty gradient: gender (trivial) → income (moderate)
+   → race (near-impossible with current methods)
+2. no universal best method — effectiveness is
+   attribute × model specific
+3. Suppression is consistently the weakest or worst method,
+   sometimes increasing disparity — naive feature removal
+   is not a valid mitigation strategy
+4. degenerate models are a real risk: EG under tight constraints
+   + weak model capacity (LR) + high baseline bias (income 0.47)
+   = model collapse to all-negative predictions
+5. race disparity is robust to all four mitigation approaches,
+   especially for complex models (XGB) — suggests the
+   disparity source is not simple feature-level bias but
+   deeper distributional differences across racial groups
+"""
 def f3_method_gap_comparison():
     """All-method EOpp comparison — reads directly from mit_df."""
     ieee_style()
@@ -840,10 +916,8 @@ def f3_method_gap_comparison():
 
 from matplotlib.transforms import blended_transform_factory
 
-
-def f4_mit_detail_gap_dumbbell():
-    """
-    Paper RQ3: TPR-span dumbbell, before vs after best mitigation.
+"""
+    figure 10: TPR-span dumbbell, before vs after best mitigation.
     18 segments = 9 (model × attr) × 2 (baseline + best mitigation).
 
     Findings:
@@ -852,7 +926,9 @@ def f4_mit_detail_gap_dumbbell():
     3. Race: most resistant — XGB+EG barely shrinks (0.68→0.63)
     4. Method diversity: gender/income pick varied methods;
        race uniformly selects EG yet EG struggles with 5-group disparity
-    """
+"""
+def f4_mit_detail_gap_dumbbell():
+   
     ieee_style()
 
     # ── best method per model × attr (lowest EOpp, recall ≥ 0.05) ──
@@ -967,6 +1043,345 @@ def f4_mit_detail_gap_dumbbell():
     save(fig, "f4_mit_detail_gap_dumbbell")
 
 
+
+
+# Cross-domain code
+# ═══════════════════════════════════════════════════════════════════════════
+# Shared helper: compute % EOpp reduction per (model, method)
+# averaged across valid attributes.
+# Filters: recall < 0.05 (degenerate), baseline EOpp < 0.05 (unstable %)
+# ═══════════════════════════════════════════════════════════════════════════
+def _eopp_reduction_matrix(df, attrs, recall_thr=0.05, base_thr=0.05):
+    """
+    Returns:
+        mat: (4 methods × 3 models) array of avg % reduction, NaN where no valid attr
+        degen: same shape, True where ALL valid attrs were degenerate
+    """
+    methods = ["Reweighing", "ExponentiatedGradient", "ThresholdOptimizer", "Suppression"]
+    mat = np.full((len(methods), len(MODEL_ORDER)), np.nan)
+    mask_degen = np.zeros_like(mat, dtype=bool)
+    for ci, model in enumerate(MODEL_ORDER):
+        for ri, method in enumerate(methods):
+            reds = []
+            is_degen = False
+            for attr in attrs:
+                base_row = df[
+                    (df["model"] == model)
+                    & (df["sensitive_attr"] == attr)
+                    & (df["miti_method"] == "Baseline")
+                ]
+                meth_row = df[
+                    (df["model"] == model)
+                    & (df["sensitive_attr"] == attr)
+                    & (df["miti_method"] == method)
+                ]
+                if len(base_row) == 0 or len(meth_row) == 0:
+                    continue
+                base_eopp = base_row["Equal Opportunity"].values[0]
+                meth_eopp = meth_row["Equal Opportunity"].values[0]
+                meth_recall = meth_row["recall"].values[0]
+                if meth_recall < recall_thr:
+                    is_degen = True
+                    continue
+                if base_eopp < base_thr:
+                    continue
+                reds.append((base_eopp - meth_eopp) / base_eopp * 100)
+            if is_degen and len(reds) == 0:
+                mask_degen[ri, ci] = True
+            elif reds:
+                mat[ri, ci] = np.mean(reds)
+    return mat, mask_degen
+ 
+ 
+# ═══════════════════════════════════════════════════════════════════════════
+# [CROSSDOMAIN] X1 — Side-by-side heatmap: % EOpp reduction
+#
+# Best for PAPER. Shows per-model × per-method granularity.
+# Color scale clipped to ±100% so outliers (RF+TO = -236%) stay readable.
+# ═══════════════════════════════════════════════════════════════════════════
+def x1_crossdomain_heatmap():
+    ieee_style()
+    methods = ["Reweighing", "ExponentiatedGradient", "ThresholdOptimizer", "Suppression"]
+    m_short = [METHOD_SHORT[m] for m in methods]
+ 
+    nh_mat, nh_degen = _eopp_reduction_matrix(mit_df, ATTR)
+    ou_mat, ou_degen = _eopp_reduction_matrix(oulad_df, OULAD_ATTR)
+ 
+    fig, axes = plt.subplots(
+        1, 2, figsize=(7.16, 2.8), sharey=True,
+        gridspec_kw={"wspace": 0.08, "right": 0.88},
+    )
+ 
+    CLIP = 100  # color scale range; raw value still shown in annotation
+ 
+    for ax, mat, degen, title in [
+        (axes[0], nh_mat, nh_degen, "NHANES (Healthcare)"),
+        (axes[1], ou_mat, ou_degen, "OULAD (Education)"),
+    ]:
+        display = np.clip(mat, -CLIP, CLIP)
+        masked = np.ma.masked_invalid(display)
+        im = ax.imshow(masked, cmap="viridis", vmin=-CLIP, vmax=CLIP, aspect="auto")
+ 
+        for ri in range(len(methods)):
+            for ci in range(len(MODEL_ORDER)):
+                if degen[ri, ci]:
+                    ax.text(
+                        ci, ri, "×", ha="center", va="center",
+                        fontsize=9, fontweight="bold", color="#888888",
+                    )
+                elif np.isnan(mat[ri, ci]):
+                    ax.text(
+                        ci, ri, "—", ha="center", va="center",
+                        fontsize=7, color="#bbbbbb",
+                    )
+                else:
+                    v = mat[ri, ci]
+                    abs_v = min(abs(v), CLIP)
+                    color = "white" if abs_v > CLIP * 0.55 else "black"
+                    sign = "+" if v > 0 else ""
+                    ax.text(
+                        ci, ri, f"{sign}{v:.0f}%", ha="center", va="center",
+                        fontsize=7.5,
+                        fontweight="bold" if abs(v) > 100 else "normal",
+                        color=color,
+                    )
+ 
+        ax.set_xticks(range(len(MODEL_ORDER)))
+        ax.set_xticklabels([MODEL_SHORT[m] for m in MODEL_ORDER])
+        ax.set_title(title, fontsize=9, pad=6)
+        ax.tick_params(length=0)
+ 
+    axes[0].set_yticks(range(len(methods)))
+    axes[0].set_yticklabels(m_short)
+ 
+    cax = fig.add_axes([0.90, 0.18, 0.015, 0.65])
+    cbar = fig.colorbar(im, cax=cax)
+    cbar.set_label("EOpp reduction (%)", fontsize=7.5, labelpad=4)
+    cbar.ax.tick_params(labelsize=7)
+ 
+    fig.text(
+        0.44, 0.01,
+        "× = degenerate (recall < 0.05)     — = baseline EOpp < 0.05",
+        ha="center", fontsize=6.5, color="#666666",
+    )
+    save(fig, "x1_crossdomain_heatmap")
+ 
+
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# [CROSSDOMAIN] X2 — Grouped bar: avg % EOpp reduction per method
+#
+# Best for PPT / viva. Simpler aggregate view.
+# Error bars = range across 3 models.
+# ═══════════════════════════════════════════════════════════════════════════
+def x2_crossdomain_bar():
+    ieee_style()
+    methods = ["Reweighing", "ExponentiatedGradient", "ThresholdOptimizer", "Suppression"]
+ 
+    def _per_model_reduction(df, attrs, recall_thr=0.05, base_thr=0.05):
+        out = {}
+        for method in methods:
+            model_reds = []
+            for model in MODEL_ORDER:
+                attr_reds = []
+                for attr in attrs:
+                    base_row = df[
+                        (df["model"] == model)
+                        & (df["sensitive_attr"] == attr)
+                        & (df["miti_method"] == "Baseline")
+                    ]
+                    meth_row = df[
+                        (df["model"] == model)
+                        & (df["sensitive_attr"] == attr)
+                        & (df["miti_method"] == method)
+                    ]
+                    if len(base_row) == 0 or len(meth_row) == 0:
+                        continue
+                    base_eopp = base_row["Equal Opportunity"].values[0]
+                    meth_eopp = meth_row["Equal Opportunity"].values[0]
+                    meth_recall = meth_row["recall"].values[0]
+                    if meth_recall < recall_thr or base_eopp < base_thr:
+                        continue
+                    attr_reds.append((base_eopp - meth_eopp) / base_eopp * 100)
+                if attr_reds:
+                    model_reds.append(np.mean(attr_reds))
+            out[method] = model_reds
+        return out
+ 
+    nh = _per_model_reduction(mit_df, ATTR)
+    ou = _per_model_reduction(oulad_df, OULAD_ATTR)
+ 
+    fig, ax = plt.subplots(figsize=(7.16, 3.0))
+    x = np.arange(len(methods))
+    w = 0.35
+ 
+    for offset, data, label, color in [
+        (-w / 2, nh, "NHANES (Healthcare)", "#2980b9"),
+        (w / 2, ou, "OULAD (Education)", "#e67e22"),
+    ]:
+        means = [np.mean(data[m]) if data[m] else 0 for m in methods]
+        lo = [np.mean(data[m]) - min(data[m]) if len(data[m]) > 1 else 0 for m in methods]
+        hi = [max(data[m]) - np.mean(data[m]) if len(data[m]) > 1 else 0 for m in methods]
+ 
+        ax.bar(
+            x + offset, means, w, label=label, color=color,
+            edgecolor="white", linewidth=0.5,
+        )
+        ax.errorbar(
+            x + offset, means, yerr=[lo, hi], fmt="none",
+            ecolor="#333333", capsize=3, capthick=0.8, linewidth=0.8,
+        )
+        for i, v in enumerate(means):
+            if v != 0:
+                sign = "+" if v > 0 else ""
+                vy = v + (3 if v >= 0 else -3)
+                va = "bottom" if v >= 0 else "top"
+                ax.text(
+                    x[i] + offset, vy, f"{sign}{v:.0f}%",
+                    ha="center", va=va, fontsize=7,
+                )
+ 
+    ax.axhline(0, color="black", lw=0.6)
+    ax.set_xticks(x)
+    ax.set_xticklabels([METHOD_SHORT[m] for m in methods])
+    ax.set_ylabel("Avg EOpp reduction (%)")
+    ax.set_title("Cross-domain mitigation effectiveness")
+    ax.legend(loc="upper left", framealpha=0.9)
+    ax.spines[["top", "right"]].set_visible(False)
+ 
+    # clip y so the RF+TO outlier does not dominate
+    y_lo = max(
+        min(min(np.mean(d[m]) for m in methods if d[m]) for d in [nh, ou]) - 15,
+        -90,
+    )
+    ax.set_ylim(y_lo, 85)
+ 
+    # annotate clipped bar
+    ou_to_mean = np.mean(ou["ThresholdOptimizer"]) if ou["ThresholdOptimizer"] else 0
+    if ou_to_mean < y_lo:
+        ax.annotate(
+            f"{ou_to_mean:.0f}%\n(RF backfire)",
+            xy=(x[2] + w / 2, y_lo + 2),
+            ha="center", va="bottom", fontsize=6.5,
+            color="#c0392b", fontweight="bold",
+        )
+        ax.annotate(
+            "", xy=(x[2] + w / 2, y_lo),
+            xytext=(x[2] + w / 2, y_lo + 8),
+            arrowprops=dict(arrowstyle="->", color="#c0392b", lw=1.2),
+        )
+ 
+    ax.text(
+        0.5, -0.12,
+        "Error bars = range across 3 models. "
+        "Excludes degenerate (recall < 0.05) and near-zero baselines (EOpp < 0.05)",
+        transform=ax.transAxes, ha="center", fontsize=6, color="#666666",
+    )
+    fig.tight_layout()
+    save(fig, "x2_crossdomain_bar")
+ 
+ 
+# ═══════════════════════════════════════════════════════════════════════════
+# [CROSSDOMAIN] X3 — Dumbbell: absolute EOpp baseline → best mitigation
+#
+# Complementary view showing raw disparity levels across domains.
+# Answers: "How hard is each domain to mitigate?"
+# ═══════════════════════════════════════════════════════════════════════════
+def x3_crossdomain_dumbbell():
+    ieee_style()
+ 
+    def _best_per_model(df, attrs, recall_thr=0.05):
+        records = []
+        for model in MODEL_ORDER:
+            base_vals, best_vals = [], []
+            for attr in attrs:
+                sub = df[(df["model"] == model) & (df["sensitive_attr"] == attr)]
+                baseline = sub[sub["miti_method"] == "Baseline"]["Equal Opportunity"].values
+                if len(baseline) == 0:
+                    continue
+                base_eopp = baseline[0]
+                base_vals.append(base_eopp)
+                miti = sub[
+                    (sub["miti_method"] != "Baseline") & (sub["recall"] >= recall_thr)
+                ]
+                if len(miti) > 0:
+                    best_idx = miti["Equal Opportunity"].idxmin()
+                    best_vals.append(miti.loc[best_idx, "Equal Opportunity"])
+                else:
+                    best_vals.append(base_eopp)
+            records.append({
+                "model": model,
+                "baseline": np.mean(base_vals),
+                "best": np.mean(best_vals),
+            })
+        return pd.DataFrame(records)
+ 
+    nh_best = _best_per_model(mit_df, ATTR)
+    ou_best = _best_per_model(oulad_df, OULAD_ATTR)
+ 
+    fig, ax = plt.subplots(figsize=(7.16, 2.8))
+ 
+    C_BASE = "#c0392b"
+    C_BEST = "#27ae60"
+    C_NH = "#2980b9"
+    C_OU = "#e67e22"
+ 
+    y = 0
+    gap = 0.6
+    for i, model in enumerate(MODEL_ORDER):
+        nh_row = nh_best[nh_best["model"] == model].iloc[0]
+        ou_row = ou_best[ou_best["model"] == model].iloc[0]
+ 
+        # OULAD row (bottom of pair)
+        ax.plot(
+            [ou_row["baseline"], ou_row["best"]], [y, y],
+            color="#dddddd", lw=1.5, zorder=1,
+        )
+        ax.scatter(ou_row["baseline"], y, s=50, color=C_BASE, zorder=3,
+                   edgecolor="white", linewidth=0.5)
+        ax.scatter(ou_row["best"], y, s=50, color=C_BEST, zorder=3,
+                   edgecolor="white", linewidth=0.5)
+        ax.text(-0.02, y, f"{MODEL_SHORT[model]} — OULAD", ha="right",
+                va="center", fontsize=7.5, color=C_OU)
+        y += 1
+ 
+        # NHANES row (top of pair)
+        ax.plot(
+            [nh_row["baseline"], nh_row["best"]], [y, y],
+            color="#dddddd", lw=1.5, zorder=1,
+        )
+        ax.scatter(nh_row["baseline"], y, s=50, color=C_BASE, zorder=3,
+                   edgecolor="white", linewidth=0.5)
+        ax.scatter(nh_row["best"], y, s=50, color=C_BEST, zorder=3,
+                   edgecolor="white", linewidth=0.5)
+        ax.text(-0.02, y, f"{MODEL_SHORT[model]} — NHANES", ha="right",
+                va="center", fontsize=7.5, color=C_NH)
+        y += gap
+ 
+    ax.set_xlim(-0.02, max(nh_best["baseline"].max(), 0.5) + 0.05)
+    ax.set_ylim(-0.5, y - gap + 0.5)
+    ax.set_yticks([])
+    ax.set_xlabel("Average EOpp Difference (across attributes)")
+    ax.set_title("Baseline vs Best Mitigation: NHANES and OULAD")
+    ax.spines[["top", "right", "left"]].set_visible(False)
+ 
+    ax.axvline(0.1, color="grey", ls="--", lw=0.8, alpha=0.5)
+    ax.text(0.1, y - gap + 0.3, "0.1", ha="center", fontsize=6.5, color="grey")
+ 
+    legend_elements = [
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=C_BASE,
+               markersize=7, label="Baseline"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=C_BEST,
+               markersize=7, label="Best mitigation"),
+    ]
+    ax.legend(handles=legend_elements, loc="lower right", fontsize=7, framealpha=0.9)
+    fig.tight_layout()
+    save(fig, "x3_crossdomain_dumbbell")
+
+
+
 if __name__ == "__main__":
     r1_baseline_performance()
     f1_baseline_details_dumbbell()
@@ -978,3 +1393,6 @@ if __name__ == "__main__":
     f2_tradeoff_f1_EOpp()
     f3_method_gap_comparison()
     f4_mit_detail_gap_dumbbell()
+    x1_crossdomain_heatmap()
+    x2_crossdomain_bar()
+    x3_crossdomain_dumbbell()
