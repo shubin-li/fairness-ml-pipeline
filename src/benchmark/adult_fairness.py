@@ -380,6 +380,89 @@ def save_baseline_results(
     print(f"Test scores saved -> {test_path}")
 
 
+# =====================================================================
+# 3b. Baseline fairness evaluation (mirror nhanes_fairness)
+# =====================================================================
+def run_fairness_eval_for_all(
+    fitted_models: dict,
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
+) -> dict[str, dict[str, tuple[dict, pd.DataFrame]]]:
+    """
+    Run baseline fairness evaluation for all sensitive attributes and all
+    models on the held-out test set, then save. Same logic/shape as
+    nhanes_fairness.run_fairness_eval_for_all (Adult sensitive attrs sex/race).
+    """
+    results = {}
+
+    sensitive_df = extract_sensitive_attrs(X_test)
+
+    for name, pipe in fitted_models.items():
+        y_pred = pipe.predict(X_test)
+        results[name] = {}
+        for col in sensitive_df.columns:
+            summary, details_df = run_fairness_eval(
+                y_true=y_test, y_pred=y_pred, sensitive_col=sensitive_df[col]
+            )
+            results[name][col] = (summary, details_df)
+    save_fairness_results(results)
+    return results
+
+
+def save_fairness_results(
+    all_results: dict[str, dict[str, tuple[dict, pd.DataFrame]]],
+    results_dir: Path = RESULTS_DIR,
+):
+    """
+    Save baseline fairness evaluation results to disk, schema-identical to the
+    NHANES files:
+
+      1. detail  CSV -> model, sensitive_attr, group, selection_rate,
+                        true_positive_rate, false_positive_rate, count,
+                        positive_rate
+      2. summary CSV -> model, sensitive_attr, Equal Opportunity,
+                        Equalized Odds, Demographic Parity
+    """
+    detail_rows = []
+    summary_rows = []
+    results_dir.mkdir(parents=True, exist_ok=True)
+    for model_name, attr_dict in all_results.items():
+        for attr_name, (summary, details_df) in attr_dict.items():
+
+            #  detail: flatten per-group rows
+            for group_name, row in details_df.iterrows():
+                detail_rows.append(
+                    {
+                        "model": model_name,
+                        "sensitive_attr": attr_name,
+                        "group": group_name,
+                        **row.to_dict(),
+                    }
+                )
+
+            #  summary: one row per (model, attr)
+            summary_rows.append(
+                {
+                    "model": model_name,
+                    "sensitive_attr": attr_name,
+                    **summary,
+                }
+            )
+
+    detail_df = pd.DataFrame(detail_rows)
+    summary_df = pd.DataFrame(summary_rows)
+
+    detail_path = results_dir / "adult_fairness_baseline_detail.csv"
+    summary_path = results_dir / "adult_fairness_baseline_summary.csv"
+
+    detail_df.to_csv(detail_path, index=False, float_format="%.4f")
+    summary_df.to_csv(summary_path, index=False, float_format="%.4f")
+
+    print(f"Fairness detail  saved -> {detail_path}")
+    print(f"Fairness summary saved -> {summary_path}")
+    return detail_df, summary_df
+
+
 def get_fitted_models_and_split_data():
     X, y, raw_df = load_adult()
 
@@ -397,6 +480,9 @@ def get_fitted_models_and_split_data():
 
     test_results = eval_on_test(models, X_test, y_test)
     save_baseline_results(models_cv_score, test_results)
+
+    # baseline fairness detail/summary, same models & split as the mitigation grid
+    run_fairness_eval_for_all(models, X_test, y_test)
 
     return models, X_train, X_test, y_train, y_test
 

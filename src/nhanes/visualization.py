@@ -15,22 +15,13 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 import seaborn as sns
 from pathlib import Path
+from dataclasses import dataclass
 
 RESULTS_DIR = Path(__file__).parent.parent / "results" / "nhanes"
 FIG = RESULTS_DIR / "figures"
 
-# Data
-mit_df = pd.read_csv(RESULTS_DIR / "nhanes_mitigation_results.csv")
-cv_df = pd.read_csv(RESULTS_DIR / "nhanes_baseline_cv.csv")
-test_df = pd.read_csv(RESULTS_DIR / "nhanes_baseline_test.csv")
-detail_df = pd.read_csv(RESULTS_DIR / "nhanes_fairness_baseline_detail.csv")
-summary_df = pd.read_csv(RESULTS_DIR / "nhanes_fairness_baseline_summary.csv")
-mit_detail_df = pd.read_csv(RESULTS_DIR / "nhanes_mitigation_detail.csv")
-
-#oulad data
-oulad_df = pd.read_csv(RESULTS_DIR / ".." / "oulad" / "oulad_mitigation_results__1_.xls")
-
-# nhanes config
+# Cross-dataset constants — identical for every dataset, stay module-global.
+# (NOT part of VizConfig: colors, method/model orderings, fairness metrics.)
 
 # cividis viridis magma
 HEATMAP_CMAP = "cividis"
@@ -59,17 +50,63 @@ METHOD_SHORT = {
 MODEL_ORDER = ["LogisticRegression", "RandomForest", "XGB"]
 MODEL_SHORT = {"LogisticRegression": "LR", "RandomForest": "RF", "XGB": "XGB"}
 MODEL_COLORS = ["#2c3e50", "#2980b9", "#e67e22"]
-ATTR = ["gender", "income", "race"]
-ATTR_TITLES = {"gender": "Gender", "income": "Income Group", "race": "Race Group"}
 FAIR_METRICS = ["Demographic Parity", "Equal Opportunity", "Equalized Odds"]
 METRIC_SHORT = {"Demographic Parity": "DP", "Equal Opportunity": "EOpp", "Equalized Odds": "EOdds"}
 
-# group display order
-GROUP_ORDER = {
-    "gender": ["Female", "Male"],
-    "income": ["Above threshold", "Near poverty", "Low income"],
-    "race": ["Asian", "Black", "Hispanic", "Other Race", "White"],
-}
+
+
+# Dataset-specific config. Everything the ten parametrized figures need that
+# varies across datasets is collected here (paths, dataframes, attribute
+# metadata). 
+@dataclass
+class VizConfig:
+    RESULTS_DIR: Path
+    FIG: Path
+    mit_df: pd.DataFrame
+    cv_df: pd.DataFrame
+    test_df: pd.DataFrame
+    detail_df: pd.DataFrame
+    mit_detail_df: pd.DataFrame
+    ATTR: list
+    ATTR_TITLES: dict
+    ATTR_TITLES_SHORT: dict
+    GROUP_ORDER: dict
+
+
+def build_nhanes_config() -> VizConfig:
+    results_dir = Path(__file__).parent.parent / "results" / "nhanes"
+    return VizConfig(
+        RESULTS_DIR=results_dir,
+        FIG=results_dir / "figures",
+        mit_df=pd.read_csv(results_dir / "nhanes_mitigation_results.csv"),
+        cv_df=pd.read_csv(results_dir / "nhanes_baseline_cv.csv"),
+        test_df=pd.read_csv(results_dir / "nhanes_baseline_test.csv"),
+        detail_df=pd.read_csv(results_dir / "nhanes_fairness_baseline_detail.csv"),
+        mit_detail_df=pd.read_csv(results_dir / "nhanes_mitigation_detail.csv"),
+        ATTR=["gender", "income", "race"],
+        ATTR_TITLES={"gender": "Gender", "income": "Income Group", "race": "Race Group"},
+        ATTR_TITLES_SHORT={"gender": "Gender", "income": "Income", "race": "Race"},
+        GROUP_ORDER={
+            "gender": ["Female", "Male"],
+            "income": ["Above threshold", "Near poverty", "Low income"],
+            "race": ["Asian", "Black", "Hispanic", "Other Race", "White"],
+        },
+    )
+
+
+NHANES_CONFIG = build_nhanes_config()
+
+# NHANES data kept module-global for the OULAD cross-domain figures (x1–x4),
+# which are not parametrized and read these directly.
+mit_df = NHANES_CONFIG.mit_df
+detail_df = NHANES_CONFIG.detail_df
+mit_detail_df = NHANES_CONFIG.mit_detail_df
+ATTR = NHANES_CONFIG.ATTR
+ATTR_TITLES = NHANES_CONFIG.ATTR_TITLES
+GROUP_ORDER = NHANES_CONFIG.GROUP_ORDER
+
+#oulad data
+oulad_df = pd.read_csv(RESULTS_DIR / ".." / "oulad" / "oulad_mitigation_results__1_.xls")
 
 # OULAD config
 OULAD_ATTR = ["gender", "region", "age_band"]
@@ -120,7 +157,8 @@ def save(fig, name):
 
 
 # get sample size of a group, from detail_df
-def group_n(attr, group):
+def group_n(cfg, attr, group):
+    detail_df = cfg.detail_df
     r = detail_df[(detail_df["sensitive_attr"] == attr) & (detail_df["group"] == group)]
     return int(r["count"].iloc[0]) if len(r) else 0
 
@@ -149,7 +187,10 @@ training data.
 CV evaluates on unseen validation folds within the training set,
 same principle as the held-out test set. So CV vs Test can verify generalization.
 """
-def r1_baseline_performance():
+def r1_baseline_performance(cfg):
+    global FIG
+    FIG = cfg.FIG
+    cv_df = cfg.cv_df; test_df = cfg.test_df
     ieee_style()
     cvm = cv_df[cv_df['fold']=='mean']; cvs = cv_df[cv_df['fold']=='std']
     cv_cols  = ['test_accuracy','test_precision','test_recall','test_f1','test_roc_auc']
@@ -257,14 +298,18 @@ explained away by "the groups just have different base rates".
 """
 C_BASE = "#888888"   # true positive rate (prevalence)
 C_SEL = "#d62728"    # model selection rate
-ATTR_TITLES_SHORT = {"gender": "Gender", "income": "Income", "race": "Race"}
-def f1_baseline_details_dumbbell():
+def f1_baseline_details_dumbbell(cfg):
     """
     Within one attribute block, the spread of red dots = DP gap; the differential
     in gray-to-red distance across groups = how that DP gap is amplified.
     """
+    global FIG
+    FIG = cfg.FIG
+    ATTR = cfg.ATTR; GROUP_ORDER = cfg.GROUP_ORDER
+    detail_df = cfg.detail_df; ATTR_TITLES_SHORT = cfg.ATTR_TITLES_SHORT
     ieee_style()
-    fig, axes = plt.subplots(1, 3, figsize=(8.4, 4.6), sharex=True)
+    # columns = models (fixed 3); attributes vary only in the vertical stack
+    fig, axes = plt.subplots(1, len(MODEL_ORDER), figsize=(8.4, 4.6), sharex=True)
 
     # stack all attribute groups vertically, blank gap between attributes
     rowlabels, ypos, sep, layout = [], [], [], {}
@@ -357,19 +402,24 @@ Race:
     is not better skill on that group.
 
 """
-def r2_baseline_detais_tpr_fpr():
+def r2_baseline_detais_tpr_fpr(cfg):
+    global FIG
+    FIG = cfg.FIG
+    ATTR = cfg.ATTR; ATTR_TITLES = cfg.ATTR_TITLES
+    detail_df = cfg.detail_df; GROUP_ORDER = cfg.GROUP_ORDER
+    last = len(ATTR) - 1  # colorbar drawn on the last attribute column
     ieee_style()
-    fig, axes = plt.subplots(2, 3, figsize=(8.2, 5.2))
+    fig, axes = plt.subplots(2, len(ATTR), figsize=(8.2, 5.2), squeeze=False)
     for r, metric in enumerate(['true_positive_rate', 'false_positive_rate']):
         for c, attr in enumerate(ATTR):
             ax = axes[r, c]
             sub = detail_df[detail_df['sensitive_attr']==attr]
             piv = sub.pivot(index='group', columns='model', values=metric).reindex(GROUP_ORDER[attr])
             piv = piv[MODEL_ORDER]; piv.columns = [MODEL_SHORT[m] for m in MODEL_ORDER]
-            ylabels = [f"{g}\n(n={group_n(attr,g)})" for g in piv.index]
+            ylabels = [f"{g}\n(n={group_n(cfg,attr,g)})" for g in piv.index]
             sns.heatmap(piv, annot=True, fmt='.2f', cmap= HEATMAP_CMAP, ax=ax, vmin=0, vmax=1,
-                        linewidths=0.5, linecolor='white', cbar=(c==2),
-                        cbar_kws={'shrink':0.7} if c==2 else {}, yticklabels=ylabels)
+                        linewidths=0.5, linecolor='white', cbar=(c==last),
+                        cbar_kws={'shrink':0.7} if c==last else {}, yticklabels=ylabels)
             ax.set_title(ATTR_TITLES[attr] if r==0 else '')
             ax.set_ylabel(('TPR' if r==0 else 'FPR')+'  by group' if c==0 else '')
             ax.set_xlabel(''); ax.tick_params(axis='y', rotation=0)
@@ -410,9 +460,16 @@ summary:
 - Gender is the easiest attribute to mitigate (most methods push below 0.10)
 - Income is the most responsive to Reweighing but the hardest to fix via Suppression (proxy features)
 """
-def r3_fairness_mit_grid_full():
+def r3_fairness_mit_grid_full(cfg):
+    global FIG
+    FIG = cfg.FIG
+    ATTR = cfg.ATTR; ATTR_TITLES = cfg.ATTR_TITLES; mit_df = cfg.mit_df
     ieee_style()
-    fig, axes = plt.subplots(3, 3, figsize=(7.16, 7.5))
+    # rows = attributes, cols = fairness metrics; height scales with attr count
+    fig, axes = plt.subplots(
+        len(ATTR), len(FAIR_METRICS),
+        figsize=(7.16, 7.5 * len(ATTR) / 3), squeeze=False,
+    )
     for ri, attr in enumerate(ATTR):
         for ci, fm in enumerate(FAIR_METRICS):
             ax = axes[ri, ci]; sub = mit_df[mit_df['sensitive_attr']==attr]
@@ -480,10 +537,17 @@ Row 3 (F1):
    linear boundary cannot satisfy tight fairness constraints.
 4. Gender is easy, income/race are hard
 """
-def r4_performance_mit_grid_full():
+def r4_performance_mit_grid_full(cfg):
+    global FIG
+    FIG = cfg.FIG
+    ATTR = cfg.ATTR; ATTR_TITLES = cfg.ATTR_TITLES; mit_df = cfg.mit_df
     ieee_style()
     metrics = [('accuracy', 'Accuracy'), ('recall', 'Recall'), ('f1', 'F1-Score')]
-    fig, axes = plt.subplots(3, 3, figsize=(7.16, 6.5), sharey='row')
+    # rows fixed = 3 performance metrics, cols = attributes; width scales with attr count
+    fig, axes = plt.subplots(
+        3, len(ATTR), figsize=(7.16 * len(ATTR) / 3, 6.5),
+        sharey='row', squeeze=False,
+    )
 
     for ri, (pm, pl) in enumerate(metrics):
         for ci, attr in enumerate(ATTR):
@@ -524,7 +588,9 @@ def r4_performance_mit_grid_full():
 
     axes[0, 0].set_ylim(0, 1.0)
     axes[1, 0].set_ylim(0, 1.0)
-    axes[2, 0].set_ylim(0, 0.5)
+    # data-driven F1 top: never below the NHANES-tuned 0.5 (keeps NHANES
+    # pixel-identical), expands when F1 runs higher (e.g. Adult) so bars fit
+    axes[2, 0].set_ylim(0, max(0.5, mit_df['f1'].max() * 1.15))
 
     h = [Patch(facecolor=METHOD_COLORS[m], edgecolor='white') for m in METHOD_ORDER]
     fig.legend(h, [METHOD_SHORT[m] for m in METHOD_ORDER],
@@ -583,9 +649,13 @@ Findings:
    model-attribute combination, not the method alone.
 
 """
-def r5_disparity_reduction():
+def r5_disparity_reduction(cfg):
+    global FIG
+    FIG = cfg.FIG
+    ATTR = cfg.ATTR; ATTR_TITLES = cfg.ATTR_TITLES; mit_df = cfg.mit_df
     ieee_style()
-    fig, axes = plt.subplots(1, 3, figsize=(7.16, 2.7), sharey=True)
+    fig, axes = plt.subplots(1, len(ATTR), figsize=(7.16 * len(ATTR) / 3, 2.7), sharey=True)
+    axes = np.atleast_1d(axes)
     for idx, attr in enumerate(ATTR):
         ax = axes[idx]; sub = mit_df[mit_df['sensitive_attr']==attr]
         x = np.arange(len(MODEL_ORDER)); w = 0.7
@@ -608,7 +678,10 @@ def r5_disparity_reduction():
     save(fig,  "r5_disparity_reduction")
 
 # fig7
-def r6_disparity_reduction():
+def r6_disparity_reduction(cfg):
+    global FIG
+    FIG = cfg.FIG
+    ATTR = cfg.ATTR; ATTR_TITLES = cfg.ATTR_TITLES; mit_df = cfg.mit_df
     ppt_style()
     fig, ax = plt.subplots(figsize=(11, 6))
     rows = []
@@ -703,10 +776,17 @@ Cross-panel patterns:
     (income EOpp≈0.47). not a group-count issue — it is model
     capacity × constraint tightness × baseline disparity magnitude
 """
-def f2_tradeoff_f1_EOpp():
+def f2_tradeoff_f1_EOpp(cfg):
+    global FIG
+    FIG = cfg.FIG
+    ATTR = cfg.ATTR; ATTR_TITLES = cfg.ATTR_TITLES; mit_df = cfg.mit_df
     ieee_style()
     markers = {'LogisticRegression':'o','RandomForest':'s','XGB':'^'}
-    fig, axes = plt.subplots(1, 3, figsize=(7.16, 2.9), sharey=True)
+    # data-driven upper x limit: never below the NHANES-tuned 0.45 (keeps NHANES
+    # pixel-identical), expands when F1 runs higher (e.g. Adult) so no point clips
+    x_hi = max(0.45, mit_df['f1'].max() * 1.1)
+    fig, axes = plt.subplots(1, len(ATTR), figsize=(7.16 * len(ATTR) / 3, 2.9), sharey=True)
+    axes = np.atleast_1d(axes)
     for idx, attr in enumerate(ATTR):
         ax = axes[idx]; sub = mit_df[mit_df['sensitive_attr']==attr]
         for _, r in sub.iterrows():
@@ -720,7 +800,7 @@ def f2_tradeoff_f1_EOpp():
                 ax.scatter(r['f1'], r['Equal Opportunity'], marker='x', c='red',
                            s=34, linewidth=1.1, zorder=4)
         ax.axhline(0.1, color='red', ls='--', lw=0.7, alpha=0.6)
-        ax.set_xlabel('F1-Score'); ax.set_title(ATTR_TITLES[attr]); ax.set_xlim(-0.02, 0.45)
+        ax.set_xlabel('F1-Score'); ax.set_title(ATTR_TITLES[attr]); ax.set_xlim(-0.02, x_hi)
         if idx==0: ax.set_ylabel('Equal Opportunity Diff.')
         ax.spines[['top','right']].set_visible(False)
     # TWO-ROW legend: row1 methods, row2 models (+ degenerate marker)
@@ -814,8 +894,11 @@ Cross-panel takeaways:
    disparity source is not simple feature-level bias but
    deeper distributional differences across racial groups
 """
-def f3_method_gap_comparison():
+def f3_method_gap_comparison(cfg):
     """All-method EOpp comparison — reads directly from mit_df."""
+    global FIG
+    FIG = cfg.FIG
+    ATTR = cfg.ATTR; ATTR_TITLES = cfg.ATTR_TITLES; mit_df = cfg.mit_df
     ieee_style()
 
     gap_rows = []
@@ -829,7 +912,8 @@ def f3_method_gap_comparison():
         })
     gaps = pd.DataFrame(gap_rows)
 
-    fig, axes = plt.subplots(1, 3, figsize=(7.16, 3.2), sharey=True)
+    fig, axes = plt.subplots(1, len(ATTR), figsize=(7.16 * len(ATTR) / 3, 3.2), sharey=True)
+    axes = np.atleast_1d(axes)
 
     for idx, attr in enumerate(ATTR):
         ax = axes[idx]
@@ -928,8 +1012,12 @@ from matplotlib.transforms import blended_transform_factory
     4. Method diversity: gender/income pick varied methods;
        race uniformly selects EG yet EG struggles with 5-group disparity
 """
-def f4_mit_detail_gap_dumbbell():
-   
+def f4_mit_detail_gap_dumbbell(cfg):
+    global FIG
+    FIG = cfg.FIG
+    ATTR = cfg.ATTR; ATTR_TITLES = cfg.ATTR_TITLES
+    mit_df = cfg.mit_df; mit_detail_df = cfg.mit_detail_df
+    nmodels = len(MODEL_ORDER)  # models per attribute group
     ieee_style()
 
     # ── best method per model × attr (lowest EOpp, recall ≥ 0.05) ──
@@ -961,15 +1049,15 @@ def f4_mit_detail_gap_dumbbell():
                 a_lo=ag["true_positive_rate"].min(),
             ))
 
-    # ── x positions: 3 attr groups × 3 models, gaps between groups ──
+    # ── x positions: attr groups × models, gaps between groups ──
     GAP = 0.7
     OFF = 0.14
     xs, xi = [], 0
-    for ai in range(3):
-        for _ in range(3):
+    for ai in range(len(ATTR)):
+        for _ in range(nmodels):
             xs.append(xi)
             xi += 1
-        if ai < 2:
+        if ai < len(ATTR) - 1:
             xi += GAP
 
     # ── figure ──
@@ -1008,14 +1096,14 @@ def f4_mit_detail_gap_dumbbell():
     # ── attribute group labels above plot ──
     trans = blended_transform_factory(ax.transData, ax.transAxes)
     for ai, attr in enumerate(ATTR):
-        gx = xs[ai * 3: ai * 3 + 3]
+        gx = xs[ai * nmodels: ai * nmodels + nmodels]
         ax.text(np.mean(gx), 1.06, ATTR_TITLES[attr],
                 transform=trans, ha="center", va="bottom",
                 fontsize=9, fontweight="bold")
 
     # ── dashed separators ──
-    for k in range(2):
-        sx = (xs[k * 3 + 2] + xs[k * 3 + 3]) / 2
+    for k in range(len(ATTR) - 1):
+        sx = (xs[k * nmodels + nmodels - 1] + xs[k * nmodels + nmodels]) / 2
         ax.axvline(sx, color="#dee2e6", ls=":", lw=0.6, zorder=0)
 
     # ── axes ──
@@ -1615,16 +1703,18 @@ def x4_crossdomain_reduction_matrix():
 
 
 if __name__ == "__main__":
-    r1_baseline_performance()
-    f1_baseline_details_dumbbell()
-    r2_baseline_detais_tpr_fpr()
-    r3_fairness_mit_grid_full()
-    r4_performance_mit_grid_full()
-    r5_disparity_reduction()
-    r6_disparity_reduction()
-    f2_tradeoff_f1_EOpp()
-    f3_method_gap_comparison()
-    f4_mit_detail_gap_dumbbell()
+    # ten parametrized figures — driven by the NHANES config
+    r1_baseline_performance(NHANES_CONFIG)
+    f1_baseline_details_dumbbell(NHANES_CONFIG)
+    r2_baseline_detais_tpr_fpr(NHANES_CONFIG)
+    r3_fairness_mit_grid_full(NHANES_CONFIG)
+    r4_performance_mit_grid_full(NHANES_CONFIG)
+    r5_disparity_reduction(NHANES_CONFIG)
+    r6_disparity_reduction(NHANES_CONFIG)
+    f2_tradeoff_f1_EOpp(NHANES_CONFIG)
+    f3_method_gap_comparison(NHANES_CONFIG)
+    f4_mit_detail_gap_dumbbell(NHANES_CONFIG)
+
     x1_crossdomain_heatmap()
     x2_crossdomain_bar()
     x3_crossdomain_gender()
