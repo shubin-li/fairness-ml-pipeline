@@ -698,7 +698,7 @@ Cross-panel patterns:
 3. Suppression is the worst method overall — never best on income
     or race, sometimes backfires. confirms naive suppression is not
     a real mitigation strategy
-4. degenerate model root cause: LR linear capacity too weak to
+4. ★ degenerate model root cause: LR linear capacity too weak to
     satisfy tight EG fairness constraint when baseline bias is huge
     (income EOpp≈0.47). not a group-count issue — it is model
     capacity × constraint tightness × baseline disparity magnitude
