@@ -1888,6 +1888,9 @@ recall-based rule is calibrated to the all-negative degenerate mode, which is
 what a model falls into when the positive class is rare.
 
 Output goes into nhanes/figures only.
+
+TODO:need change later. It's unmeaningful, we should not mean the amplification across different sensitive attributes. 
+we should show the amplification in gender only.
 """
 def d3_crossdataset_attribution(cfg):
     global FIG
