@@ -23,6 +23,8 @@ from nhanes.visualization import (
     f2_tradeoff_f1_EOpp,
     f3_method_gap_comparison,
     f4_mit_detail_gap_dumbbell,
+    d1_false_fairness_quadrant,
+    d2_amplification_decomposition,
 )
 
 RESULTS_DIR = Path(__file__).parent.parent / "results" / "benchmark" / "adult"
@@ -72,3 +74,6 @@ if __name__ == "__main__":
     f2_tradeoff_f1_EOpp(ADULT_CONFIG)
     f3_method_gap_comparison(ADULT_CONFIG)
     f4_mit_detail_gap_dumbbell(ADULT_CONFIG)
+    # diagnostic figures d1 and d2 for Adult (into adult/figures)
+    d1_false_fairness_quadrant(ADULT_CONFIG)
+    d2_amplification_decomposition(ADULT_CONFIG)

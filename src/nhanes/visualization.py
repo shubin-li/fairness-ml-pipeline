@@ -1,7 +1,7 @@
 """
 Author: Shubin Li
 
-generate NHANES figures for both in paper and viva
+generate figures for both in paper and viva, reuse for nhanes, adult, german
 
 """
 
@@ -1702,6 +1702,259 @@ def x4_crossdomain_reduction_matrix():
     save(fig, "x4_crossdomain_reduction_matrix")
 
 
+# Diagnostic figures. These read only the diagnostic CSVs
+# written by diagnostics.py. d1 and d2 are
+# parametrized per dataset the same way as the ten figures above: they take a
+# VizConfig, redirect the module-global FIG to cfg.FIG, and resolve the
+# diagnostic CSV from cfg.RESULTS_DIR. The dataset name is the results dir name
+# (nhanes, adult, german) and the CSV basename shares that prefix, so no new
+# path mechanism is needed and VizConfig stays unchanged.
+
+# recall threshold matches the diagnostics.py false-fairness rule
+FF_RECALL_THR = 0.05
+# gap threshold below which a small gap could be mistaken for fairness
+FF_GAP_THR = 0.05
+
+
+def _diag_csv(cfg, kind):
+    """Resolve a diagnostic CSV path from the config results dir.
+
+    kind is 'false_fairness' or 'manufactured_disparity'. The dataset name is
+    the results dir name and the file basename shares that prefix.
+    """
+    name = cfg.RESULTS_DIR.name
+    return cfg.RESULTS_DIR / f"{name}_{kind}.csv"
+
+
+def _short_tag(model, method):
+    """Compact model plus method tag for annotating flagged points."""
+    return f"{MODEL_SHORT.get(model, model)}/{METHOD_SHORT.get(method, method)}"
+
+
+"""
+figure d1: False-Fairness quadrant (Tool 1, RQ2)
+
+x = gap (Equal Opportunity), y = min_group_recall, one point per
+(model, sensitive_attr, miti_method). Vertical line at gap = 0.05, horizontal
+line at recall = 0.05. The lower-left region (gap < 0.05 and recall < 0.05) is
+shaded and labelled False fairness: a point there looks fair by gap but has a
+collapsed subgroup. Points flagged false_fairness_flag are red, others muted.
+
+Message: a small gap alone does not mean fair. A shaded-zone point reaches a
+small gap by under-serving a subgroup to the point of recall collapse, not by
+treating groups evenly.
+"""
+def d1_false_fairness_quadrant(cfg):
+    global FIG
+    FIG = cfg.FIG
+    ieee_style()
+
+    path = _diag_csv(cfg, "false_fairness")
+    if not path.exists():
+        print(f">>> skip d1: missing {path.name}")
+        return
+    df = pd.read_csv(path)
+    # flag column is read as bool by pandas, guard against string just in case
+    flag = df["false_fairness_flag"]
+    if flag.dtype == object:
+        flag = flag.astype(str).str.lower().eq("true")
+    df = df.assign(_flag=flag.values)
+
+    fig, ax = plt.subplots(figsize=(4.2, 3.6))
+
+    # shaded lower-left region: small gap AND collapsed recall
+    ax.axhspan(0, FF_RECALL_THR, xmin=0, xmax=1, color="#f2d7d5", zorder=0)
+    ax.axvspan(0, FF_GAP_THR, ymin=0, ymax=1, color="#f2d7d5", zorder=0)
+    # threshold lines
+    ax.axvline(FF_GAP_THR, color="#c0392b", ls="--", lw=0.8, alpha=0.8, zorder=1)
+    ax.axhline(FF_RECALL_THR, color="#c0392b", ls="--", lw=0.8, alpha=0.8, zorder=1)
+
+    muted = df[~df["_flag"]]
+    flagged = df[df["_flag"]]
+    ax.scatter(muted["gap"], muted["min_group_recall"], s=26,
+               color="#95a5a6", edgecolor="white", linewidth=0.4,
+               alpha=0.85, zorder=3, label="Not flagged")
+    ax.scatter(flagged["gap"], flagged["min_group_recall"], s=42,
+               color="#c0392b", edgecolor="white", linewidth=0.5,
+               zorder=4, label="False fairness flagged")
+
+    # annotate flagged points with a short model/method tag
+    for _, r in flagged.iterrows():
+        ax.annotate(_short_tag(r["model"], r["miti_method"]),
+                    (r["gap"], r["min_group_recall"]),
+                    textcoords="offset points", xytext=(4, 3),
+                    fontsize=6, color="#c0392b")
+
+    # label the shaded zone, placed above the recall line so it stays clear of
+    # points and annotations that sit on the origin
+    ax.text(FF_GAP_THR * 0.5, FF_RECALL_THR + 0.03, "False\nfairness",
+            ha="center", va="bottom", fontsize=7, color="#c0392b",
+            fontweight="bold", zorder=2)
+
+    ax.set_xlabel("Equal Opportunity gap")
+    ax.set_ylabel("Minimum group recall")
+    ax.set_xlim(-0.02, max(0.05, df["gap"].max()) * 1.1 + 0.02)
+    ax.set_ylim(-0.02, max(0.05, df["min_group_recall"].max()) * 1.1 + 0.02)
+    ax.set_title(f"False-fairness quadrant ({cfg.RESULTS_DIR.name})")
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.legend(loc="upper right", fontsize=7, framealpha=0.9)
+
+    fig.tight_layout()
+    save(fig, "d1_false_fairness_quadrant")
+
+
+"""
+figure d2: Amplification decomposition (Tool 2, RQ3)
+
+Bars grouped by miti_method along x so amplification is seen changing across
+mitigation methods, paneled by sensitive_attr. Bar height = amplification.
+A zero reference line separates the two regimes: above zero the model
+manufactures disparity beyond what the data carries, below zero the model
+outputs less spread than the data carries.
+
+Message: mitigation should shrink positive amplification. The figure shows
+where a method fails to shrink it or drives it negative.
+"""
+def d2_amplification_decomposition(cfg):
+    global FIG
+    FIG = cfg.FIG
+    ieee_style()
+
+    path = _diag_csv(cfg, "manufactured_disparity")
+    if not path.exists():
+        print(f">>> skip d2: missing {path.name}")
+        return
+    df = pd.read_csv(path)
+
+    attrs = [a for a in cfg.ATTR if a in df["sensitive_attr"].unique()]
+    if not attrs:
+        print(f">>> skip d2: no known attrs in {path.name}")
+        return
+    # methods present, held in the canonical order
+    methods = [m for m in METHOD_ORDER if m in df["miti_method"].unique()]
+
+    fig, axes = plt.subplots(
+        1, len(attrs), figsize=(3.6 * len(attrs), 3.2),
+        sharey=True, squeeze=False,
+    )
+    axes = axes[0]
+
+    x = np.arange(len(methods))
+    w = 0.8 / max(len(MODEL_ORDER), 1)
+    n = len(MODEL_ORDER)
+
+    for ci, attr in enumerate(attrs):
+        ax = axes[ci]
+        sub = df[df["sensitive_attr"] == attr]
+        for mi, model in enumerate(MODEL_ORDER):
+            vals = []
+            for method in methods:
+                row = sub[(sub["model"] == model) & (sub["miti_method"] == method)]
+                vals.append(row["amplification"].values[0] if len(row) else np.nan)
+            off = (mi - n / 2 + 0.5) * w
+            ax.bar(x + off, vals, w, color=MODEL_COLORS[mi % len(MODEL_COLORS)],
+                   edgecolor="white", linewidth=0.3, label=MODEL_SHORT[model])
+        ax.axhline(0, color="black", lw=0.8, zorder=1)
+        ax.set_xticks(x)
+        ax.set_xticklabels([METHOD_SHORT[m] for m in methods], rotation=0)
+        ax.set_title(cfg.ATTR_TITLES.get(attr, attr))
+        ax.spines[["top", "right"]].set_visible(False)
+        if ci == 0:
+            ax.set_ylabel("Amplification")
+
+    h = [Patch(facecolor=MODEL_COLORS[i % len(MODEL_COLORS)], label=MODEL_SHORT[m])
+         for i, m in enumerate(MODEL_ORDER)]
+    fig.legend(handles=h, loc="lower center", ncol=len(MODEL_ORDER),
+               bbox_to_anchor=(0.5, -0.04), fontsize=7.5, frameon=False)
+    fig.suptitle(
+        f"Amplification across mitigation methods ({cfg.RESULTS_DIR.name})",
+        y=1.0, fontsize=10,
+    )
+    fig.tight_layout(rect=[0, 0.04, 1, 0.97])
+    save(fig, "d2_amplification_decomposition")
+
+
+"""
+figure d3: Cross-dataset characteristic attribution
+
+Reads false_fairness and manufactured_disparity for whichever of nhanes,
+adult, german exist. Datasets are ordered by positive-prevalence rate
+(nhanes low, adult mid, german high), NOT by domain. Per dataset it plots
+mean amplification and false-fairness flag count against that prevalence axis.
+
+Message: diagnostic behavior is characteristic-driven, not domain-driven.
+False-fairness flags concentrate in the low-prevalence dataset because the
+recall-based rule is calibrated to the all-negative degenerate mode, which is
+what a model falls into when the positive class is rare.
+
+Output goes into nhanes/figures only.
+"""
+def d3_crossdataset_attribution(cfg):
+    global FIG
+    FIG = cfg.FIG
+    ieee_style()
+
+    # dataset results dirs, ordered low to high positive prevalence
+    base = cfg.RESULTS_DIR.parent
+    candidates = [
+        ("nhanes", base / "nhanes"),
+        ("adult", base / "benchmark" / "adult"),
+        ("german", base / "benchmark" / "german"),
+    ]
+
+    found, mean_amp, flag_count = [], [], []
+    for name, d in candidates:
+        ff = d / f"{name}_false_fairness.csv"
+        md = d / f"{name}_manufactured_disparity.csv"
+        if not ff.exists() or not md.exists():
+            continue
+        ff_df = pd.read_csv(ff)
+        md_df = pd.read_csv(md)
+        flag = ff_df["false_fairness_flag"]
+        if flag.dtype == object:
+            flag = flag.astype(str).str.lower().eq("true")
+        found.append(name)
+        mean_amp.append(md_df["amplification"].mean())
+        flag_count.append(int(flag.sum()))
+
+    if not found:
+        print(">>> skip d3: no diagnostic CSVs found")
+        return
+    print(f">>> d3 datasets found: {', '.join(found)}")
+
+    x = np.arange(len(found))
+    fig, ax1 = plt.subplots(figsize=(4.6, 3.4))
+
+    # mean amplification as bars on the left axis
+    b = ax1.bar(x, mean_amp, 0.5, color="#2980b9", edgecolor="white",
+                linewidth=0.4, zorder=2, label="Mean amplification")
+    ax1.axhline(0, color="black", lw=0.8, zorder=1)
+    ax1.set_ylabel("Mean amplification", color="#2980b9")
+    ax1.tick_params(axis="y", labelcolor="#2980b9")
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(found)
+    ax1.set_xlabel("Dataset ordered by positive prevalence (low to high)")
+    ax1.spines[["top"]].set_visible(False)
+
+    # false-fairness flag count as a line on the right axis
+    ax2 = ax1.twinx()
+    ln = ax2.plot(x, flag_count, "o-", color="#c0392b", lw=1.5, ms=6,
+                  zorder=3, label="False-fairness flag count")
+    ax2.set_ylabel("False-fairness flag count", color="#c0392b")
+    ax2.tick_params(axis="y", labelcolor="#c0392b")
+    ax2.set_ylim(bottom=0)
+    ax2.spines[["top"]].set_visible(False)
+
+    handles = [b, ln[0]]
+    labels = [h.get_label() for h in handles]
+    ax1.legend(handles, labels, loc="upper center",
+               bbox_to_anchor=(0.5, -0.16), ncol=2, fontsize=7, frameon=False)
+
+    ax1.set_title("Diagnostic readings vs positive prevalence")
+    fig.tight_layout()
+    save(fig, "d3_crossdataset_attribution")
+
+
 if __name__ == "__main__":
     # ten parametrized figures — driven by the NHANES config
     r1_baseline_performance(NHANES_CONFIG)
@@ -1719,3 +1972,8 @@ if __name__ == "__main__":
     x2_crossdomain_bar()
     x3_crossdomain_gender()
     x4_crossdomain_reduction_matrix()
+
+    # diagnostic figures: d1 and d2 per dataset config, d3 once (into nhanes)
+    d1_false_fairness_quadrant(NHANES_CONFIG)
+    d2_amplification_decomposition(NHANES_CONFIG)
+    d3_crossdataset_attribution(NHANES_CONFIG)
