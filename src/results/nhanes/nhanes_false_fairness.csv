@@ -1,0 +1,46 @@
+model,sensitive_attr,miti_method,group,min_group_recall,gap,count,false_fairness_flag
+LogisticRegression,gender,Baseline,Male,0.5532,0.1611,471.0,False
+LogisticRegression,gender,Reweighing,Female,0.6327,0.0269,620.0,False
+LogisticRegression,gender,ExponentiatedGradient,Male,0.617,0.036,471.0,False
+LogisticRegression,gender,ThresholdOptimizer,Male,0.5957,0.0471,471.0,False
+LogisticRegression,gender,Suppression,Female,0.6224,0.0158,620.0,False
+LogisticRegression,income,Baseline,Above threshold,0.4815,0.4709,800.0,False
+LogisticRegression,income,Reweighing,Above threshold,0.6049,0.1223,800.0,False
+LogisticRegression,income,ExponentiatedGradient,Above threshold,0.0,0.0,800.0,True
+LogisticRegression,income,ThresholdOptimizer,Above threshold,0.7901,0.0735,800.0,False
+LogisticRegression,income,Suppression,Above threshold,0.5062,0.351,800.0,False
+LogisticRegression,race,Baseline,Asian,0.1667,0.6398,54.0,False
+LogisticRegression,race,Reweighing,Asian,0.1667,0.6333,54.0,False
+LogisticRegression,race,ExponentiatedGradient,Asian,0.0,0.1613,54.0,False
+LogisticRegression,race,ThresholdOptimizer,Asian,0.5,0.2097,54.0,False
+LogisticRegression,race,Suppression,Asian,0.1667,0.6398,54.0,False
+RandomForest,gender,Baseline,Male,0.1915,0.1657,471.0,False
+RandomForest,gender,Reweighing,Male,0.234,0.1027,471.0,False
+RandomForest,gender,ExponentiatedGradient,Male,0.2128,0.1342,471.0,False
+RandomForest,gender,ThresholdOptimizer,Male,0.6596,0.0547,471.0,False
+RandomForest,gender,Suppression,Male,0.2553,0.0814,471.0,False
+RandomForest,income,Baseline,Above threshold,0.1975,0.2787,800.0,False
+RandomForest,income,Reweighing,Above threshold,0.2346,0.0836,800.0,False
+RandomForest,income,ExponentiatedGradient,Low income,0.1905,0.0823,197.0,False
+RandomForest,income,ThresholdOptimizer,Above threshold,0.5679,0.2503,800.0,False
+RandomForest,income,Suppression,Above threshold,0.2593,0.1217,800.0,False
+RandomForest,race,Baseline,Asian,0.0,0.45,54.0,False
+RandomForest,race,Reweighing,Asian,0.0,0.45,54.0,False
+RandomForest,race,ExponentiatedGradient,Asian,0.0,0.3077,54.0,False
+RandomForest,race,ThresholdOptimizer,Asian,0.3333,0.3333,54.0,False
+RandomForest,race,Suppression,Asian,0.0,0.5,54.0,False
+XGB,gender,Baseline,Male,0.5319,0.1314,471.0,False
+XGB,gender,Reweighing,Male,0.617,0.0156,471.0,False
+XGB,gender,ExponentiatedGradient,Male,0.5745,0.0684,471.0,False
+XGB,gender,ThresholdOptimizer,Male,0.5319,0.1211,471.0,False
+XGB,gender,Suppression,Male,0.5957,0.0471,471.0,False
+XGB,income,Baseline,Above threshold,0.4568,0.4242,800.0,False
+XGB,income,Reweighing,Above threshold,0.5556,0.0808,800.0,False
+XGB,income,ExponentiatedGradient,Near poverty,0.5,0.0926,94.0,False
+XGB,income,ThresholdOptimizer,Low income,0.4048,0.2316,197.0,False
+XGB,income,Suppression,Above threshold,0.5556,0.2778,800.0,False
+XGB,race,Baseline,Asian,0.0,0.6774,54.0,False
+XGB,race,Reweighing,Asian,0.0,0.6667,54.0,False
+XGB,race,ExponentiatedGradient,Asian,0.0,0.6282,54.0,False
+XGB,race,ThresholdOptimizer,Asian,0.1667,0.6333,54.0,False
+XGB,race,Suppression,Asian,0.1667,0.6833,54.0,False

@@ -1,0 +1,46 @@
+model,sensitive_attr,miti_method,observed_gap,true_prevalence_gap,amplification,max_sr_group,min_sr_group
+LogisticRegression,gender,Baseline,0.1392,0.0583,0.0809,Female,Male
+LogisticRegression,gender,Reweighing,0.032,0.0583,-0.0263,Male,Female
+LogisticRegression,gender,ExponentiatedGradient,0.0033,0.0583,-0.055,Male,Female
+LogisticRegression,gender,ThresholdOptimizer,0.0433,0.0583,-0.015,Male,Female
+LogisticRegression,gender,Suppression,0.0337,0.0583,-0.0246,Male,Female
+LogisticRegression,income,Baseline,0.5884,0.1327,0.4557,Low income,Above threshold
+LogisticRegression,income,Reweighing,0.16,0.1327,0.0273,Low income,Above threshold
+LogisticRegression,income,ExponentiatedGradient,0.0013,0.1327,-0.1314,Above threshold,Low income
+LogisticRegression,income,ThresholdOptimizer,0.104,0.1327,-0.0287,Near poverty,Above threshold
+LogisticRegression,income,Suppression,0.4532,0.1327,0.3205,Low income,Above threshold
+LogisticRegression,race,Baseline,0.4704,0.0681,0.4023,Hispanic,Asian
+LogisticRegression,race,Reweighing,0.422,0.0681,0.3539,Other Race,Asian
+LogisticRegression,race,ExponentiatedGradient,0.0622,0.0681,-0.0059,Black,Asian
+LogisticRegression,race,ThresholdOptimizer,0.1891,0.0681,0.121,Asian,Other Race
+LogisticRegression,race,Suppression,0.3482,0.0681,0.2801,Black,Asian
+RandomForest,gender,Baseline,0.0506,0.0583,-0.0077,Female,Male
+RandomForest,gender,Reweighing,0.0315,0.0583,-0.0268,Female,Male
+RandomForest,gender,ExponentiatedGradient,0.0266,0.0583,-0.0317,Female,Male
+RandomForest,gender,ThresholdOptimizer,0.0151,0.0583,-0.0432,Male,Female
+RandomForest,gender,Suppression,0.0021,0.0583,-0.0562,Female,Male
+RandomForest,income,Baseline,0.3167,0.1327,0.184,Low income,Above threshold
+RandomForest,income,Reweighing,0.1101,0.1327,-0.0226,Low income,Above threshold
+RandomForest,income,ExponentiatedGradient,0.0631,0.1327,-0.0696,Low income,Above threshold
+RandomForest,income,ThresholdOptimizer,0.1774,0.1327,0.0447,Near poverty,Low income
+RandomForest,income,Suppression,0.2029,0.1327,0.0702,Low income,Above threshold
+RandomForest,race,Baseline,0.2366,0.0681,0.1685,Black,Asian
+RandomForest,race,Reweighing,0.229,0.0681,0.1609,Black,Asian
+RandomForest,race,ExponentiatedGradient,0.1158,0.0681,0.0477,Other Race,Asian
+RandomForest,race,ThresholdOptimizer,0.0966,0.0681,0.0285,Asian,Black
+RandomForest,race,Suppression,0.2334,0.0681,0.1653,Black,Asian
+XGB,gender,Baseline,0.0728,0.0583,0.0145,Female,Male
+XGB,gender,Reweighing,0.028,0.0583,-0.0303,Male,Female
+XGB,gender,ExponentiatedGradient,0.0231,0.0583,-0.0352,Female,Male
+XGB,gender,ThresholdOptimizer,0.0105,0.0583,-0.0478,Female,Male
+XGB,gender,Suppression,0.0093,0.0583,-0.049,Male,Female
+XGB,income,Baseline,0.4762,0.1327,0.3435,Low income,Above threshold
+XGB,income,Reweighing,0.1932,0.1327,0.0605,Low income,Above threshold
+XGB,income,ExponentiatedGradient,0.0493,0.1327,-0.0834,Near poverty,Above threshold
+XGB,income,ThresholdOptimizer,0.1483,0.1327,0.0156,Near poverty,Low income
+XGB,income,Suppression,0.3777,0.1327,0.245,Low income,Above threshold
+XGB,race,Baseline,0.3837,0.0681,0.3156,Hispanic,Asian
+XGB,race,Reweighing,0.3958,0.0681,0.3277,Other Race,Asian
+XGB,race,ExponentiatedGradient,0.0933,0.0681,0.0252,Hispanic,Asian
+XGB,race,ThresholdOptimizer,0.0241,0.0681,-0.044,Hispanic,White
+XGB,race,Suppression,0.2775,0.0681,0.2094,Black,White
