@@ -57,7 +57,7 @@ RANDOM_STATE = 42
 TEST_SIZE = 0.2
 N_FOLDS = 5
 
-RESULTS_DIR = Path(__file__).parent.parent / "results" / "benchmark"
+RESULTS_DIR = Path(__file__).parent.parent / "results" / "benchmark" / "adult"
 
 # reference category dropped from race one-hot (largest group -> White)
 RACE_REFERENCE = "White"

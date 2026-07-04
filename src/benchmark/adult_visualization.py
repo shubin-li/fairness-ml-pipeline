@@ -25,7 +25,7 @@ from nhanes.visualization import (
     f4_mit_detail_gap_dumbbell,
 )
 
-RESULTS_DIR = Path(__file__).parent.parent / "results" / "benchmark"
+RESULTS_DIR = Path(__file__).parent.parent / "results" / "benchmark" / "adult"
 FIG = RESULTS_DIR / "figures"
 
 
