@@ -1,0 +1,13 @@
+model,sensitive_attr,group,selection_rate,true_positive_rate,false_positive_rate,count,positive_rate
+LogisticRegression,sex,Female,0.5167,0.6000,0.3500,60.0000,0.6667
+LogisticRegression,sex,Male,0.5786,0.6800,0.3250,140.0000,0.7143
+LogisticRegression,age_group,old,0.5640,0.6694,0.2917,172.0000,0.7209
+LogisticRegression,age_group,young,0.5357,0.5625,0.5000,28.0000,0.5714
+RandomForest,sex,Female,0.5667,0.6500,0.4000,60.0000,0.6667
+RandomForest,sex,Male,0.5786,0.7300,0.2000,140.0000,0.7143
+RandomForest,age_group,old,0.6163,0.7500,0.2708,172.0000,0.7209
+RandomForest,age_group,young,0.3214,0.3750,0.2500,28.0000,0.5714
+XGB,sex,Female,0.5500,0.6250,0.4000,60.0000,0.6667
+XGB,sex,Male,0.5571,0.6800,0.2500,140.0000,0.7143
+XGB,age_group,old,0.5930,0.7016,0.3125,172.0000,0.7209
+XGB,age_group,young,0.3214,0.3750,0.2500,28.0000,0.5714
