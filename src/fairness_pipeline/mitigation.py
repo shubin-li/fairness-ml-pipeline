@@ -12,7 +12,9 @@ mitigation selection & theory reference:
 2.ExponentiatedGradient(redutions&in-processing| Fairlearn):
     Paper:A reductions approach to fair classification.  http://proceedings.mlr.press/v80/agarwal18a.html. https://arxiv.org/abs/1803.02453
 3.Threshold optimizer(post-processing|Fairlearn):
-    Paper:Equality of opportunity in supervised learning.  https://proceedings.neurips.cc/paper/2016/hash/9d2682367c3935defcb1f9e247a97c0d-Abstract.html.
+    Paper:Equality of opportunity in supervised learning.  https://proceedings.neurips.cc/paper/2016/hash/9d2682367c3935defcb1f9e247a97c0d-Abstract.html. ??
+    https://arxiv.org/abs/1610.02413
+
 4.Suppression (naive drop sensitive cols| implement by ourself) as baseline contrast:
     Paper:Fairness definitions explained  https://dl.acm.org/doi/abs/10.1145/3194770.3194776
 
