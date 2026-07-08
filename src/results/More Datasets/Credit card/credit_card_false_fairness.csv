@@ -1,0 +1,16 @@
+model,sensitive_attr,miti_method,group,min_group_recall,gap,count,false_fairness_flag
+LogisticRegression,gender,Baseline,Female,0.5822,0.0898,3598.0,False
+LogisticRegression,gender,Reweighing,Female,0.5849,0.0872,3598.0,False
+LogisticRegression,gender,ExponentiatedGradient,Female,0.5822,0.0898,3598.0,False
+LogisticRegression,gender,ThresholdOptimizer,Male,0.2674,0.0812,2402.0,False
+LogisticRegression,gender,Suppression,Female,0.6057,0.0271,3598.0,False
+RandomForest,gender,Baseline,Male,0.3316,0.0196,2402.0,False
+RandomForest,gender,Reweighing,Male,0.3191,0.0256,2402.0,False
+RandomForest,gender,ExponentiatedGradient,Female,0.3316,0.0249,3598.0,False
+RandomForest,gender,ThresholdOptimizer,Male,0.1711,0.2114,2402.0,False
+RandomForest,gender,Suppression,Male,0.3226,0.0338,2402.0,False
+XGB,gender,Baseline,Female,0.6136,0.0067,3598.0,False
+XGB,gender,Reweighing,Female,0.6097,0.0089,3598.0,False
+XGB,gender,ExponentiatedGradient,Male,0.6007,0.0246,2402.0,False
+XGB,gender,ThresholdOptimizer,Male,0.3494,0.0697,2402.0,False
+XGB,gender,Suppression,Male,0.615,0.009,2402.0,False

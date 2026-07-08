@@ -174,6 +174,54 @@ def run_diagnostics(dataset, results_dir):
     }
 
 
+def run_diagnostics_from_paths(results_path, detail_path, output_prefix=None):
+    """Read two CSVs from arbitrary paths and write the two diagnostic tables.
+
+    Unlike run_diagnostics this does not assume the DATASET_CANDIDATES naming
+    or the benchmark/{dataset} layout. The two paths are read directly and each
+    already includes its filename. Output CSVs land in the same directory as
+    results_path. When output_prefix is given it names the outputs; otherwise
+    the prefix comes from the results filename by stripping a trailing
+    _mitigation_results.csv, falling back to the filename stem. Returns a
+    summary dict with the same shape as run_diagnostics.
+    """
+    if not os.path.isfile(results_path):
+        raise FileNotFoundError("results CSV not found: {}".format(results_path))
+    if not os.path.isfile(detail_path):
+        raise FileNotFoundError("detail CSV not found: {}".format(detail_path))
+
+    out_dir = os.path.dirname(results_path)
+    if output_prefix is None:
+        results_name = os.path.basename(results_path)
+        suffix = "_mitigation_results.csv"
+        if results_name.endswith(suffix):
+            output_prefix = results_name[: -len(suffix)]
+        else:
+            output_prefix = os.path.splitext(results_name)[0]
+
+    # roc_auc may be blank for ExponentiatedGradient and ThresholdOptimizer.
+    # These tools do not read AUC, so pandas parsing the blank as NaN is fine.
+    results_df = pd.read_csv(results_path)
+    detail_df = pd.read_csv(detail_path)
+
+    ff_df = false_fairness(results_df, detail_df)
+    md_df = manufactured_disparity(detail_df)
+
+    ff_path = os.path.join(out_dir, "{}_false_fairness.csv".format(output_prefix))
+    md_path = os.path.join(out_dir, "{}_manufactured_disparity.csv".format(output_prefix))
+
+    ff_df.round(4).to_csv(ff_path, index=False)
+    md_df.round(4).to_csv(md_path, index=False)
+
+    return {
+        "dataset": output_prefix,
+        "false_fairness_flags": int(ff_df["false_fairness_flag"].sum()),
+        "positive_amplification": int((md_df["amplification"] > 0).sum()),
+        "false_fairness_path": ff_path,
+        "manufactured_disparity_path": md_path,
+    }
+
+
 def _find_results_dir():
     """Return the path to the results directory, relative to this file."""
     here = os.path.dirname(os.path.abspath(__file__))
@@ -199,3 +247,41 @@ if __name__ == "__main__":
 
     if not found_any:
         print("No mitigation CSVs found under {}".format(results_dir))
+
+    # summary = run_diagnostics_from_paths(
+    #     r"src\results\oulad\oulad_mitigation_results__1_.xls",
+    #     r"src\results\oulad\oulad_mitigation_detail__1_.csv",
+    # )
+    # print(
+    #     "{}: {} false-fairness flags, {} rows with positive amplification".format(
+    #         summary["dataset"],
+    #         summary["false_fairness_flags"],
+    #         summary["positive_amplification"],
+    #     )
+    # )
+
+    summary = run_diagnostics_from_paths(
+        r"src\results\More Datasets\Credit card\credit_mitigation_results.xls",
+        r"src\results\More Datasets\Credit card\credit_mitigation_detail.xls",
+        output_prefix="credit_card",
+    )
+    print(
+        "{}: {} false-fairness flags, {} rows with positive amplification".format(
+            summary["dataset"],
+            summary["false_fairness_flags"],
+            summary["positive_amplification"],
+        )
+    )
+
+    summary = run_diagnostics_from_paths(
+        r"src\results\More Datasets\Bank marketing\bank_marketing_mitigation_results_final.csv",
+        r"src\results\More Datasets\Bank marketing\bank_marketing_mitigation_detail_final.csv",
+        output_prefix="bank_marketing",
+    )
+    print(
+        "{}: {} false-fairness flags, {} rows with positive amplification".format(
+            summary["dataset"],
+            summary["false_fairness_flags"],
+            summary["positive_amplification"],
+        )
+    )

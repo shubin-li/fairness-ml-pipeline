@@ -1,0 +1,16 @@
+model,sensitive_attr,miti_method,observed_gap,true_prevalence_gap,amplification,max_sr_group,min_sr_group
+LogisticRegression,gender,Baseline,0.1332,0.0207,0.1125,Male,Female
+LogisticRegression,gender,Reweighing,0.1337,0.0207,0.113,Male,Female
+LogisticRegression,gender,ExponentiatedGradient,0.1332,0.0207,0.1125,Male,Female
+LogisticRegression,gender,ThresholdOptimizer,0.014,0.0207,-0.0067,Female,Male
+LogisticRegression,gender,Suppression,0.0514,0.0207,0.0307,Male,Female
+RandomForest,gender,Baseline,0.008,0.0207,-0.0127,Male,Female
+RandomForest,gender,Reweighing,0.0104,0.0207,-0.0103,Male,Female
+RandomForest,gender,ExponentiatedGradient,0.0356,0.0207,0.0149,Male,Female
+RandomForest,gender,ThresholdOptimizer,0.068,0.0207,0.0473,Female,Male
+RandomForest,gender,Suppression,0.0093,0.0207,-0.0114,Male,Female
+XGB,gender,Baseline,0.0511,0.0207,0.0304,Male,Female
+XGB,gender,Reweighing,0.051,0.0207,0.0303,Male,Female
+XGB,gender,ExponentiatedGradient,0.0004,0.0207,-0.0203,Male,Female
+XGB,gender,ThresholdOptimizer,0.0147,0.0207,-0.006,Female,Male
+XGB,gender,Suppression,0.0373,0.0207,0.0166,Male,Female
