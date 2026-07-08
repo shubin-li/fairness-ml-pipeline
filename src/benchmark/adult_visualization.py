@@ -25,6 +25,7 @@ from nhanes.visualization import (
     f4_mit_detail_gap_dumbbell,
     d1_false_fairness_quadrant,
     d2_amplification_decomposition,
+    paper_fig3_adult_method_gaps
 )
 
 RESULTS_DIR = Path(__file__).parent.parent / "results" / "benchmark" / "adult"
@@ -77,3 +78,5 @@ if __name__ == "__main__":
     # diagnostic figures d1 and d2 for Adult (into adult/figures)
     d1_false_fairness_quadrant(ADULT_CONFIG)
     d2_amplification_decomposition(ADULT_CONFIG)
+
+    paper_fig3_adult_method_gaps(ADULT_CONFIG)

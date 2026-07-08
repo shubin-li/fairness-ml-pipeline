@@ -1958,6 +1958,230 @@ def d3_crossdataset_attribution(cfg):
     save(fig, "d3_crossdataset_attribution")
 
 
+
+
+
+
+# paper figures: these are the figures that appear in the paper. 
+
+EOPP_PAPER = "Equal Opportunity"
+DEGEN_RECALL_PAPER = 0.01  
+_MODEL_MARKERS_PAPER = {"LogisticRegression": "o", "RandomForest": "s", "XGB": "^"}
+
+
+# ---------------- Fig 2: F1 vs EOpp trade-off (RQ1) ------------------
+def paper_fig2_nhanes_tradeoff(cfg, attrs=None, out="paper_fig2_nhanes_tradeoff"):
+    """One panel per attribute, scatter F1 vs EOpp, degenerate configs x-marked.
+    Full-width (7.16in), in-panel legends."""
+    global FIG
+    FIG = cfg.FIG
+    ieee_style()
+    df = cfg.mit_df
+    attrs = attrs or cfg.ATTR
+    titles = [cfg.ATTR_TITLES.get(a, a) for a in attrs]
+
+    x_hi = max(0.45, df["f1"].max() * 1.1)
+    fig, axes = plt.subplots(1, len(attrs), figsize=(7.16, 2.45), sharey=True)
+    axes = np.atleast_1d(axes)
+    for ax, attr, title in zip(axes, attrs, titles):
+        sub = df[df.sensitive_attr == attr]
+        for _, r in sub.iterrows():
+            degen = r["recall"] < DEGEN_RECALL_PAPER
+            col = METHOD_COLORS[r["miti_method"]]
+            ax.scatter(r["f1"], r[EOPP_PAPER],
+                       c="none" if degen else col,
+                       edgecolors=col if degen else "white",
+                       marker=_MODEL_MARKERS_PAPER[r["model"]], s=48,
+                       linewidth=1.1 if degen else 0.4, alpha=0.9, zorder=3)
+            if degen:
+                ax.scatter(r["f1"], r[EOPP_PAPER], marker="x", c="red",
+                           s=34, linewidth=1.1, zorder=4)
+        ax.axhline(0.1, color="red", ls="--", lw=0.7, alpha=0.6)
+        ax.set_xlabel("F1-Score")
+        ax.set_title(title)
+        ax.set_xlim(-0.02, x_hi)
+        ax.spines[["top", "right"]].set_visible(False)
+    axes[0].set_ylabel("Equal Opportunity Diff.")
+
+    mh = [Line2D([0], [0], marker="o", color="w",
+                 markerfacecolor=METHOD_COLORS[m], markersize=6.5,
+                 label=METHOD_SHORT[m]) for m in METHOD_ORDER]
+    kh = [Line2D([0], [0], marker=_MODEL_MARKERS_PAPER[m], color="w",
+                 markerfacecolor="gray", markersize=6.5,
+                 label=MODEL_SHORT[m]) for m in MODEL_ORDER]
+    kh += [Line2D([0], [0], marker="x", color="red", lw=0,
+                  markersize=6.5, label="degenerate")]
+    axes[0].legend(handles=mh, loc="upper left", frameon=False, fontsize=7,
+                   handletextpad=0.3, borderaxespad=0.2, labelspacing=0.35)
+    if len(axes) > 1:
+        axes[1].legend(handles=kh, loc="upper left", frameon=False, fontsize=7,
+                       handletextpad=0.3, borderaxespad=0.2, labelspacing=0.35)
+    fig.tight_layout()
+    save(fig, out)
+
+
+# ------------- Fig 3: method comparison per classifier (RQ2) ---------
+def paper_fig3_adult_method_gaps(cfg, attrs=None, out="paper_fig3_adult_method_gaps"):
+    """Single-column (3.5in). Gray baseline level + per-method outcome per
+    classifier, in-panel legend."""
+    global FIG
+    FIG = cfg.FIG
+    ieee_style()
+    df = cfg.mit_df
+    attrs = attrs or cfg.ATTR
+    titles = [cfg.ATTR_TITLES.get(a, a) for a in attrs]
+
+    fig, axes = plt.subplots(1, len(attrs), figsize=(3.5, 2.35), sharey=True)
+    axes = np.atleast_1d(axes)
+    for ax, attr, title in zip(axes, attrs, titles):
+        sub = df[df.sensitive_attr == attr]
+        for i, m in enumerate(MODEL_ORDER):
+            b = sub[(sub.model == m) & (sub.miti_method == "Baseline")][EOPP_PAPER].iloc[0]
+            ax.hlines(b, i - 0.30, i + 0.30, color="#9aa0a6", lw=2.2, zorder=2)
+            for j, meth in enumerate(METHOD_MARKERS):
+                cell = sub[(sub.model == m) & (sub.miti_method == meth)]
+                if cell.empty:
+                    continue
+                v = cell[EOPP_PAPER].iloc[0]
+                xo = i + (-0.24 + 0.16 * j)
+                ax.vlines(xo, min(b, v), max(b, v), color=METHOD_COLORS[meth],
+                          lw=0.8, alpha=0.8, zorder=3)
+                ax.scatter(xo, v, marker=METHOD_MARKERS[meth],
+                           color=METHOD_COLORS[meth], s=16, zorder=4)
+        ax.axhline(0.1, color="red", ls="--", lw=0.7, alpha=0.6)
+        ax.set_xticks(range(len(MODEL_ORDER)))
+        ax.set_xticklabels([MODEL_SHORT[m] for m in MODEL_ORDER])
+        ax.set_title(title)
+        ax.spines[["top", "right"]].set_visible(False)
+    # axes[0].set_ylabel("Equal Opportunity Diff.")
+
+    h = [Line2D([0], [0], color="#9aa0a6", lw=2.2, label="Baseline")]
+    h += [Line2D([0], [0], marker=METHOD_MARKERS[m], color="w",
+                 markerfacecolor=METHOD_COLORS[m], markersize=4.5,
+                 label=METHOD_SHORT[m]) for m in METHOD_MARKERS]
+    axes[0].legend(handles=h, loc="upper left", frameon=False, fontsize=6.3,
+                   handletextpad=0.3, borderaxespad=0.15, labelspacing=0.3)
+    fig.tight_layout()
+    save(fig, out)
+
+
+# ------------ Fig d2: amplification, compact single-column (RQ3) -----
+def paper_fig4_nhanes_amplification(cfg, attrs=None, out="paper_fig4_nhanes_amplification"):
+    """Single-column (3.5in). Amplification per method and classifier, read
+    from *_manufactured_disparity.csv via _diag_csv."""
+    global FIG
+    FIG = cfg.FIG
+    ieee_style()
+    path = _diag_csv(cfg, "manufactured_disparity")
+    if not path.exists():
+        print(f">>> skip d2_paper: missing {path.name}")
+        return
+    df = pd.read_csv(path)
+    attrs = attrs or [a for a in cfg.ATTR if a in df["sensitive_attr"].unique()]
+    titles = [cfg.ATTR_TITLES.get(a, a) for a in attrs]
+    methods = [m for m in METHOD_ORDER if m in df["miti_method"].unique()]
+
+    fig, axes = plt.subplots(1, len(attrs), figsize=(3.5, 2.1), sharey=True)
+    axes = np.atleast_1d(axes)
+    width = 0.26
+    x = np.arange(len(methods))
+    for ax, attr, title in zip(axes, attrs, titles):
+        sub = df[df.sensitive_attr == attr]
+        for k, m in enumerate(MODEL_ORDER):
+            vals = []
+            for meth in methods:
+                cell = sub[(sub.model == m) & (sub.miti_method == meth)]
+                vals.append(cell["amplification"].iloc[0] if len(cell) else np.nan)
+            ax.bar(x + (k - 1) * width, vals, width=width,
+                   color=MODEL_COLORS[k], label=MODEL_SHORT[m])
+        ax.axhline(0, color="black", lw=0.8)
+        ax.set_xticks(x)
+        ax.set_xticklabels([METHOD_SHORT[m] for m in methods], fontsize=6.8)
+        ax.set_title(title)
+        ax.spines[["top", "right"]].set_visible(False)
+    # axes[0].set_ylabel("Amplification")
+    axes[0].legend(loc="upper right", frameon=False, fontsize=6.3,
+                   handlelength=1.1, borderaxespad=0.15, labelspacing=0.3)
+    fig.tight_layout()
+    save(fig, out)
+
+
+# ---- Fig x3: gender baseline vs best mitigation, cross-dataset (E) --
+def paper_fig5_gender_cross(datasets, cfg_for_fig, out="paper_fig5_gender_cross"):
+    """2x2 grid, gender-only baseline vs best post-mitigation EOpp across
+    datasets. gender is the ONLY structurally comparable attribute across
+    datasets, so this figure is restricted to it by construction.
+
+    datasets: dict {display_name: (mitigation_results_csv_path, gender_attr)}.
+    cfg_for_fig: any cfg, only used for FIG output dir (keep it nhanes).
+    """
+    global FIG
+    FIG = cfg_for_fig.FIG
+    ieee_style()
+
+    items = [(n, p, a) for n, (p, a) in datasets.items()
+             if Path(p).exists()]
+    if not items:
+        print(">>> skip x3_paper: no dataset csvs found")
+        return
+    n = len(items)
+    rows = int(np.ceil(n / 2))
+    fig, axes = plt.subplots(rows, 2, figsize=(3.5, 1.45 * rows),
+                             sharey=True, sharex=True)
+    axes = np.atleast_1d(axes).ravel()
+
+    # dataset with the lowest max-EOpp gets the legend (least cluttered panel)
+    def _maxeopp(p, a):
+        d = pd.read_csv(p)
+        return d[d.sensitive_attr == a][EOPP_PAPER].max()
+    legend_idx = min(range(n), key=lambda i: _maxeopp(items[i][1], items[i][2]))
+
+    for idx, (name, path, attr) in enumerate(items):
+        ax = axes[idx]
+        sub = pd.read_csv(path)
+        sub = sub[sub.sensitive_attr == attr]
+        base, best = [], []
+        for m in MODEL_ORDER:
+            base.append(sub[(sub.model == m) &
+                            (sub.miti_method == "Baseline")][EOPP_PAPER].iloc[0])
+            cand = sub[(sub.model == m) & (sub.miti_method != "Baseline") &
+                       (sub.recall >= DEGEN_RECALL_PAPER)]
+            best.append(cand[EOPP_PAPER].min() if len(cand) else np.nan)
+        x = np.arange(len(MODEL_ORDER))
+        ax.bar(x, base, width=0.62, color="#b0b7bd", label="Baseline")
+        ax.bar(x, best, width=0.30, color="#27ae60", label="Best mitigation")
+        ax.axhline(0.05, color="red", ls="--", lw=0.7, alpha=0.6)
+        ax.set_xticks(x)
+        ax.set_xticklabels([MODEL_SHORT[m] for m in MODEL_ORDER])
+        ax.set_title(name)
+        ax.spines[["top", "right"]].set_visible(False)
+        if idx == legend_idx:
+            ax.legend(loc="upper right", frameon=False, fontsize=6.3,
+                      handlelength=1.1, borderaxespad=0.15, labelspacing=0.3)
+    for k in range(n, len(axes)):
+        axes[k].set_visible(False)
+    for k in range(0, len(axes), 2):
+        axes[k].set_ylabel("Equal Opportunity Diff.", fontsize=7.5)
+    fig.tight_layout()
+    save(fig, out)
+
+
+
+
+
+
+RESULTS_DIR_ADULT = Path(__file__).parent.parent / "results" / "benchmark" / "adult"
+RESULTS_DIR_GERMAN = Path(__file__).parent.parent / "results" / "benchmark" / "german"
+RESULTS_DIR_OULAD = RESULTS_DIR / ".." / "oulad" / "oulad_mitigation_results__1_.xls"
+
+PAPER_DATASETS = {
+    "NHANES": (str(NHANES_CONFIG.RESULTS_DIR / "nhanes_mitigation_results.csv"), "gender"),
+    "Adult":  (str(RESULTS_DIR_ADULT / "adult_mitigation_results.csv"), "sex"),
+    "German": (str(RESULTS_DIR_GERMAN / "german_mitigation_results.csv"), "sex"),
+    "OULAD": (str(RESULTS_DIR_OULAD / "oulad_mitigation_results.csv"), "gender")
+}
+
+
 if __name__ == "__main__":
     # ten parametrized figures — driven by the NHANES config
     r1_baseline_performance(NHANES_CONFIG)
@@ -1980,3 +2204,8 @@ if __name__ == "__main__":
     d1_false_fairness_quadrant(NHANES_CONFIG)
     d2_amplification_decomposition(NHANES_CONFIG)
     d3_crossdataset_attribution(NHANES_CONFIG)
+
+    paper_fig2_nhanes_tradeoff(NHANES_CONFIG)
+    paper_fig4_nhanes_amplification(NHANES_CONFIG,attrs=["income", "race"])
+
+    paper_fig5_gender_cross(PAPER_DATASETS, NHANES_CONFIG)
