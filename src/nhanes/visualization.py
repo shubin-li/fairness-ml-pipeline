@@ -2107,13 +2107,15 @@ def paper_fig4_nhanes_amplification(cfg, attrs=None, out="paper_fig4_nhanes_ampl
 
 
 # ---- Fig x3: gender baseline vs best mitigation, cross-dataset (E) --
-def paper_fig5_gender_cross(datasets, cfg_for_fig, out="paper_fig5_gender_cross"):
-    """2x2 grid, gender-only baseline vs best post-mitigation EOpp across
+def paper_fig5_gender_cross(datasets, cfg_for_fig, out="paper_fig5_gender_cross",
+                             legend_on=None):
+    """Single row, gender-only baseline vs best post-mitigation EOpp across
     datasets. gender is the ONLY structurally comparable attribute across
     datasets, so this figure is restricted to it by construction.
 
     datasets: dict {display_name: (mitigation_results_csv_path, gender_attr)}.
     cfg_for_fig: any cfg, only used for FIG output dir (keep it nhanes).
+    legend_on: dataset display name to place the legend on; None = auto.
     """
     global FIG
     FIG = cfg_for_fig.FIG
@@ -2125,16 +2127,21 @@ def paper_fig5_gender_cross(datasets, cfg_for_fig, out="paper_fig5_gender_cross"
         print(">>> skip x3_paper: no dataset csvs found")
         return
     n = len(items)
-    rows = int(np.ceil(n / 2))
-    fig, axes = plt.subplots(rows, 2, figsize=(3.5, 1.45 * rows),
+
+    # legend placement: by dataset name, or auto (least cluttered panel)
+    if legend_on is not None:
+        names = [it[0] for it in items]
+        legend_idx = names.index(legend_on) if legend_on in names else 0
+    else:
+        def _maxeopp(p, a):
+            d = pd.read_csv(p)
+            return d[d.sensitive_attr == a][EOPP_PAPER].max()
+        legend_idx = min(range(n), key=lambda i: _maxeopp(items[i][1], items[i][2]))
+
+    # single row, full text width, shared y
+    fig, axes = plt.subplots(1, n, figsize=(7.16, 1.7),
                              sharey=True, sharex=True)
     axes = np.atleast_1d(axes).ravel()
-
-    # dataset with the lowest max-EOpp gets the legend (least cluttered panel)
-    def _maxeopp(p, a):
-        d = pd.read_csv(p)
-        return d[d.sensitive_attr == a][EOPP_PAPER].max()
-    legend_idx = min(range(n), key=lambda i: _maxeopp(items[i][1], items[i][2]))
 
     for idx, (name, path, attr) in enumerate(items):
         ax = axes[idx]
@@ -2158,10 +2165,8 @@ def paper_fig5_gender_cross(datasets, cfg_for_fig, out="paper_fig5_gender_cross"
         if idx == legend_idx:
             ax.legend(loc="upper right", frameon=False, fontsize=6.3,
                       handlelength=1.1, borderaxespad=0.15, labelspacing=0.3)
-    for k in range(n, len(axes)):
-        axes[k].set_visible(False)
-    for k in range(0, len(axes), 2):
-        axes[k].set_ylabel("Equal Opportunity Diff.", fontsize=7.5)
+
+    axes[0].set_ylabel("Equal Opportunity Diff.", fontsize=7.5)
     fig.tight_layout()
     save(fig, out)
 
@@ -2169,17 +2174,19 @@ def paper_fig5_gender_cross(datasets, cfg_for_fig, out="paper_fig5_gender_cross"
 
 
 
-
 RESULTS_DIR_ADULT = Path(__file__).parent.parent / "results" / "benchmark" / "adult"
 RESULTS_DIR_GERMAN = Path(__file__).parent.parent / "results" / "benchmark" / "german"
-RESULTS_DIR_OULAD = RESULTS_DIR / ".." / "oulad" / "oulad_mitigation_results__1_.xls"
+RESULTS_DIR_OULAD = RESULTS_DIR / ".." / "oulad"
+# RESULTS_DIR_CREDIT = Path(__file__).parent.parent / "results" / "More Datasets" / "Credit card"
 
 PAPER_DATASETS = {
     "NHANES": (str(NHANES_CONFIG.RESULTS_DIR / "nhanes_mitigation_results.csv"), "gender"),
     "Adult":  (str(RESULTS_DIR_ADULT / "adult_mitigation_results.csv"), "sex"),
     "German": (str(RESULTS_DIR_GERMAN / "german_mitigation_results.csv"), "sex"),
-    "OULAD": (str(RESULTS_DIR_OULAD / "oulad_mitigation_results.csv"), "gender")
+    "OULAD":  (str(RESULTS_DIR_OULAD / "oulad_mitigation_results__1_.xls"), "gender"),
+    # "Credit": (str(RESULTS_DIR_CREDIT / "credit_mitigation_results.xls"), "gender")
 }
+
 
 
 if __name__ == "__main__":
@@ -2208,4 +2215,4 @@ if __name__ == "__main__":
     paper_fig2_nhanes_tradeoff(NHANES_CONFIG)
     paper_fig4_nhanes_amplification(NHANES_CONFIG,attrs=["income", "race"])
 
-    paper_fig5_gender_cross(PAPER_DATASETS, NHANES_CONFIG)
+    paper_fig5_gender_cross(PAPER_DATASETS, NHANES_CONFIG,legend_on="OULAD")
