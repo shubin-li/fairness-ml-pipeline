@@ -1,0 +1,7 @@
+model,sensitive_attr,group,selection_rate,true_positive_rate,false_positive_rate,count,positive_rate
+LogisticRegression,gender,Male,0.4534,0.672,0.3867,2402.0,0.2336
+LogisticRegression,gender,Female,0.3202,0.5822,0.2493,3598.0,0.2129
+RandomForest,gender,Male,0.122,0.3316,0.0581,2402.0,0.2336
+RandomForest,gender,Female,0.114,0.3512,0.0498,3598.0,0.2129
+XGB,gender,Male,0.3168,0.6203,0.2243,2402.0,0.2336
+XGB,gender,Female,0.2657,0.6136,0.1716,3598.0,0.2129
