@@ -2183,7 +2183,7 @@ PAPER_DATASETS = {
     "NHANES": (str(NHANES_CONFIG.RESULTS_DIR / "nhanes_mitigation_results.csv"), "gender"),
     "Adult":  (str(RESULTS_DIR_ADULT / "adult_mitigation_results.csv"), "sex"),
     "German": (str(RESULTS_DIR_GERMAN / "german_mitigation_results.csv"), "sex"),
-    "OULAD":  (str(RESULTS_DIR_OULAD / "oulad_mitigation_results__1_.xls"), "gender"),
+    "OULAD":  (str(RESULTS_DIR_OULAD / "oulad_mitigation_results__2_.xls"), "gender"),
     # "Credit": (str(RESULTS_DIR_CREDIT / "credit_mitigation_results.xls"), "gender")
 }
 
