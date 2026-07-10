@@ -14,6 +14,7 @@ mitigation selection & theory reference:
 3.Threshold optimizer(post-processing|Fairlearn):
     Paper:Equality of opportunity in supervised learning.  https://proceedings.neurips.cc/paper/2016/hash/9d2682367c3935defcb1f9e247a97c0d-Abstract.html. ??
     https://arxiv.org/abs/1610.02413
+    new: https://proceedings.neurips.cc/paper_files/paper/2016/hash/6a9659feb1216f14f7384ba499518b38-Abstract.html
 
 4.Suppression (naive drop sensitive cols| implement by ourself) as baseline contrast:
     Paper:Fairness definitions explained  https://dl.acm.org/doi/abs/10.1145/3194770.3194776
