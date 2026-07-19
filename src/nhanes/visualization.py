@@ -13,6 +13,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+from matplotlib.ticker import MultipleLocator
 import seaborn as sns
 from pathlib import Path
 from dataclasses import dataclass
@@ -136,16 +137,16 @@ def ppt_style():
     plt.rcParams.update(
         {
             "font.family": "sans-serif",
-            "font.size": 16,
-            "axes.titlesize": 20,
-            "axes.labelsize": 17,
-            "xtick.labelsize": 15,
-            "ytick.labelsize": 15,
-            "legend.fontsize": 14,
+            "font.size": 15,
+            "axes.titlesize": 17,
+            "axes.labelsize": 15,
+            "xtick.labelsize": 13,
+            "ytick.labelsize": 13,
+            "legend.fontsize": 13,
             "figure.dpi": 150,
             "savefig.dpi": 200,
             "savefig.bbox": "tight",
-            "savefig.pad_inches": 0.1,
+            "savefig.pad_inches": 0.25,
             "lines.linewidth": 2.0,
             "axes.linewidth": 1.2,
         }
@@ -2036,7 +2037,7 @@ def ppt_fig2_nhanes_tradeoff(cfg, attrs=None, out="ppt_fig2_nhanes_tradeoff"):
     titles = [cfg.ATTR_TITLES.get(a, a) for a in attrs]
 
     x_hi = max(0.45, df["f1"].max() * 1.1)
-    fig, axes = plt.subplots(1, len(attrs), figsize=(11.456, 3.92), sharey=True)
+    fig, axes = plt.subplots(1, len(attrs), figsize=(14.0, 4.6), sharey=True)
     axes = np.atleast_1d(axes)
     for ax, attr, title in zip(axes, attrs, titles):
         sub = df[df.sensitive_attr == attr]
@@ -2052,11 +2053,11 @@ def ppt_fig2_nhanes_tradeoff(cfg, attrs=None, out="ppt_fig2_nhanes_tradeoff"):
                 ax.scatter(r["f1"], r[EOPP_PAPER], marker="x", c="red",
                            s=87.04, linewidth=1.76, zorder=4)
         ax.axhline(0.1, color="red", ls="--", lw=1.12, alpha=0.6)
-        ax.set_xlabel("F1-Score")
-        ax.set_title(title)
+        ax.set_xlabel("F1-Score", labelpad=6)
+        ax.set_title(title, pad=10)
         ax.set_xlim(-0.02, x_hi)
         ax.spines[["top", "right"]].set_visible(False)
-    axes[0].set_ylabel("Equal Opportunity Diff.")
+    axes[0].set_ylabel("Equal Opportunity Diff.", labelpad=6)
 
     mh = [Line2D([0], [0], marker="o", color="w",
                  markerfacecolor=METHOD_COLORS[m], markersize=10.4,
@@ -2066,12 +2067,12 @@ def ppt_fig2_nhanes_tradeoff(cfg, attrs=None, out="ppt_fig2_nhanes_tradeoff"):
                  label=MODEL_SHORT[m]) for m in MODEL_ORDER]
     kh += [Line2D([0], [0], marker="x", color="red", lw=0,
                   markersize=10.4, label="degenerate")]
-    axes[0].legend(handles=mh, loc="upper left", frameon=False, fontsize=7,
-                   handletextpad=0.3, borderaxespad=0.2, labelspacing=0.35)
-    if len(axes) > 1:
-        axes[1].legend(handles=kh, loc="upper left", frameon=False, fontsize=7,
-                       handletextpad=0.3, borderaxespad=0.2, labelspacing=0.35)
-    fig.tight_layout()
+    leg1 = fig.legend(handles=mh, loc="lower center",
+                      bbox_to_anchor=(0.5, 0.005), ncol=5, frameon=False)
+    fig.add_artist(leg1)
+    fig.legend(handles=kh, loc="lower center",
+               bbox_to_anchor=(0.5, -0.07), ncol=4, frameon=False)
+    fig.tight_layout(rect=[0, 0.16, 1, 1])
     save(fig, out)
 
 
@@ -2131,19 +2132,20 @@ def ppt_fig3_adult_method_gaps(cfg, attrs=None, out="ppt_fig3_adult_method_gaps"
     attrs = attrs or cfg.ATTR
     titles = [cfg.ATTR_TITLES.get(a, a) for a in attrs]
 
-    fig, axes = plt.subplots(1, len(attrs), figsize=(5.6, 3.76), sharey=True)
+    fig, axes = plt.subplots(1, len(attrs),
+                             figsize=(4.6 * len(attrs) + 1.5, 4.6), sharey=True)
     axes = np.atleast_1d(axes)
     for ax, attr, title in zip(axes, attrs, titles):
         sub = df[df.sensitive_attr == attr]
         for i, m in enumerate(MODEL_ORDER):
             b = sub[(sub.model == m) & (sub.miti_method == "Baseline")][EOPP_PAPER].iloc[0]
-            ax.hlines(b, i - 0.30, i + 0.30, color="#9aa0a6", lw=3.52, zorder=2)
+            ax.hlines(b, i - 0.38, i + 0.38, color="#9aa0a6", lw=3.52, zorder=2)
             for j, meth in enumerate(METHOD_MARKERS):
                 cell = sub[(sub.model == m) & (sub.miti_method == meth)]
                 if cell.empty:
                     continue
                 v = cell[EOPP_PAPER].iloc[0]
-                xo = i + (-0.24 + 0.16 * j)
+                xo = i + (-0.30 + 0.20 * j)
                 ax.vlines(xo, min(b, v), max(b, v), color=METHOD_COLORS[meth],
                           lw=1.28, alpha=0.8, zorder=3)
                 ax.scatter(xo, v, marker=METHOD_MARKERS[meth],
@@ -2151,17 +2153,21 @@ def ppt_fig3_adult_method_gaps(cfg, attrs=None, out="ppt_fig3_adult_method_gaps"
         ax.axhline(0.1, color="red", ls="--", lw=1.12, alpha=0.6)
         ax.set_xticks(range(len(MODEL_ORDER)))
         ax.set_xticklabels([MODEL_SHORT[m] for m in MODEL_ORDER])
-        ax.set_title(title)
+        ax.set_title(title, pad=10)
+        ax.grid(axis="y", alpha=0.25, lw=0.8)
+        ax.set_axisbelow(True)
         ax.spines[["top", "right"]].set_visible(False)
-    axes[0].set_ylabel("Equal Opportunity Diff.")
+    axes[0].set_ylabel("Equal Opportunity Diff.", labelpad=6)
+    axes[0].yaxis.set_major_locator(MultipleLocator(0.1))
 
     h = [Line2D([0], [0], color="#9aa0a6", lw=3.52, label="Baseline")]
     h += [Line2D([0], [0], marker=METHOD_MARKERS[m], color="w",
                  markerfacecolor=METHOD_COLORS[m], markersize=7.2,
                  label=METHOD_SHORT[m]) for m in METHOD_MARKERS]
-    axes[0].legend(handles=h, loc="upper left", frameon=False, fontsize=6.3,
-                   handletextpad=0.3, borderaxespad=0.15, labelspacing=0.3)
-    fig.tight_layout()
+    h += [Line2D([0], [0], color="red", ls="--", lw=1.12, label="0.1 threshold")]
+    fig.legend(handles=h, loc="lower center", bbox_to_anchor=(0.5, -0.02),
+               ncol=6, frameon=False)
+    fig.tight_layout(rect=[0, 0.10, 1, 1])
     save(fig, out)
 
 
@@ -2222,7 +2228,7 @@ def ppt_fig4_nhanes_amplification(cfg, attrs=None, out="ppt_fig4_nhanes_amplific
     titles = [cfg.ATTR_TITLES.get(a, a) for a in attrs]
     methods = [m for m in METHOD_ORDER if m in df["miti_method"].unique()]
 
-    fig, axes = plt.subplots(1, len(attrs), figsize=(5.6, 3.36), sharey=True)
+    fig, axes = plt.subplots(1, len(attrs), figsize=(13.5, 4.0), sharey=True)
     axes = np.atleast_1d(axes)
     width = 0.26
     x = np.arange(len(methods))
@@ -2237,13 +2243,18 @@ def ppt_fig4_nhanes_amplification(cfg, attrs=None, out="ppt_fig4_nhanes_amplific
                    color=MODEL_COLORS[k], label=MODEL_SHORT[m])
         ax.axhline(0, color="black", lw=1.28)
         ax.set_xticks(x)
-        ax.set_xticklabels([METHOD_SHORT[m] for m in methods], fontsize=6.8)
-        ax.set_title(title)
+        ax.set_xticklabels([METHOD_SHORT[m] for m in methods])
+        ax.tick_params(axis="x", pad=6)
+        ax.set_title(title, pad=10)
         ax.spines[["top", "right"]].set_visible(False)
-    axes[0].set_ylabel("Amplification")
-    axes[0].legend(loc="upper right", frameon=False, fontsize=6.3,
-                   handlelength=1.1, borderaxespad=0.15, labelspacing=0.3)
-    fig.tight_layout()
+    axes[0].set_ylabel("Amplification", labelpad=6)
+    axes[0].yaxis.set_major_locator(MultipleLocator(0.1))
+
+    h = [Patch(facecolor=MODEL_COLORS[i], label=MODEL_SHORT[m])
+         for i, m in enumerate(MODEL_ORDER)]
+    fig.legend(handles=h, loc="lower center", bbox_to_anchor=(0.5, -0.02),
+               ncol=3, frameon=False)
+    fig.tight_layout(rect=[0, 0.10, 1, 1])
     save(fig, out)
 
 
@@ -2340,10 +2351,12 @@ def ppt_fig5_gender_cross(datasets, cfg_for_fig, out="ppt_fig5_gender_cross",
         legend_idx = min(range(n), key=lambda i: _maxeopp(items[i][1], items[i][2]))
 
     # single row, full text width, shared y
-    fig, axes = plt.subplots(1, n, figsize=(11.456, 2.72),
+    fig, axes = plt.subplots(1, n, figsize=(14.0, 4.2),
                              sharey=True, sharex=True)
     axes = np.atleast_1d(axes).ravel()
 
+    # legend_on is honored above for panel choice, but the legend is now a
+    # fig-level artist, so legend_idx is no longer consulted in the loop body.
     for idx, (name, path, attr) in enumerate(items):
         ax = axes[idx]
         sub = pd.read_csv(path)
@@ -2356,19 +2369,24 @@ def ppt_fig5_gender_cross(datasets, cfg_for_fig, out="ppt_fig5_gender_cross",
                        (sub.recall >= DEGEN_RECALL_PAPER)]
             best.append(cand[EOPP_PAPER].min() if len(cand) else np.nan)
         x = np.arange(len(MODEL_ORDER))
-        ax.bar(x, base, width=0.62, color="#b0b7bd", label="Baseline")
+        ax.bar(x, base, width=0.62, color="#b0b7bd",
+               edgecolor="#4a5057", linewidth=1.2, label="Baseline")
         ax.bar(x, best, width=0.30, color="#27ae60", label="Best mitigation")
         ax.axhline(0.05, color="red", ls="--", lw=1.12, alpha=0.6)
         ax.set_xticks(x)
         ax.set_xticklabels([MODEL_SHORT[m] for m in MODEL_ORDER])
-        ax.set_title(name)
+        ax.set_title(name, pad=10)
         ax.spines[["top", "right"]].set_visible(False)
-        if idx == legend_idx:
-            ax.legend(loc="upper right", frameon=False, fontsize=6.3,
-                      handlelength=1.1, borderaxespad=0.15, labelspacing=0.3)
 
-    axes[0].set_ylabel("Equal Opportunity Diff.", fontsize=7.5)
-    fig.tight_layout()
+    axes[0].set_ylabel("Equal Opportunity Diff.", labelpad=6)
+    axes[0].yaxis.set_major_locator(MultipleLocator(0.05))
+
+    h = [Patch(facecolor="#b0b7bd", edgecolor="#4a5057", label="Baseline"),
+         Patch(facecolor="#27ae60", label="Best mitigation"),
+         Line2D([0], [0], color="red", ls="--", lw=1.12, label="0.05 threshold")]
+    fig.legend(handles=h, loc="lower center", bbox_to_anchor=(0.5, -0.02),
+               ncol=3, frameon=False)
+    fig.tight_layout(rect=[0, 0.10, 1, 1])
     save(fig, out)
 
 
@@ -2420,5 +2438,5 @@ if __name__ == "__main__":
 
 
     ppt_fig2_nhanes_tradeoff(NHANES_CONFIG)
-    ppt_fig4_nhanes_amplification(NHANES_CONFIG, attrs=["income", "race"])
+    ppt_fig4_nhanes_amplification(NHANES_CONFIG, attrs=["gender", "income", "race"])
     ppt_fig5_gender_cross(PAPER_DATASETS, NHANES_CONFIG, legend_on="OULAD")
