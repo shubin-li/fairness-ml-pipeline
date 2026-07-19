@@ -2037,7 +2037,7 @@ def ppt_fig2_nhanes_tradeoff(cfg, attrs=None, out="ppt_fig2_nhanes_tradeoff"):
     titles = [cfg.ATTR_TITLES.get(a, a) for a in attrs]
 
     x_hi = max(0.45, df["f1"].max() * 1.1)
-    fig, axes = plt.subplots(1, len(attrs), figsize=(14.0, 4.6), sharey=True)
+    fig, axes = plt.subplots(1, len(attrs), figsize=(13.0, 5.0), sharey=True)
     axes = np.atleast_1d(axes)
     for ax, attr, title in zip(axes, attrs, titles):
         sub = df[df.sensitive_attr == attr]
@@ -2228,7 +2228,7 @@ def ppt_fig4_nhanes_amplification(cfg, attrs=None, out="ppt_fig4_nhanes_amplific
     titles = [cfg.ATTR_TITLES.get(a, a) for a in attrs]
     methods = [m for m in METHOD_ORDER if m in df["miti_method"].unique()]
 
-    fig, axes = plt.subplots(1, len(attrs), figsize=(13.5, 4.0), sharey=True)
+    fig, axes = plt.subplots(1, len(attrs), figsize=(11.5, 4.6), sharey=True)
     axes = np.atleast_1d(axes)
     width = 0.26
     x = np.arange(len(methods))
