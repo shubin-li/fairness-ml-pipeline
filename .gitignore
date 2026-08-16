@@ -25,7 +25,8 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-src/data/note
+src/data/note/
+docs/
 
 # Ignore test files in specific directories
 src/nhanes/test*
