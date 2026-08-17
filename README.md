@@ -164,8 +164,9 @@ The pipeline is an audit tool for models, not a decision system. Real deployment
 | Adult Income | [UCI ML Repository](https://doi.org/10.24432/C5XW20) |
 | German Credit | [UCI ML Repository](https://doi.org/10.24432/C5NC77) |
 | OULAD | [Open University Learning Analytics Dataset](https://analyse.kmi.open.ac.uk/open-dataset) |
-| Bank Marketing | UCI ML Repository (Moro, Cortez & Rita, 2014) |
-| Credit Card Clients | UCI ML Repository (Yeh & Lien, 2009) |
+| Bank Marketing | [UCI ML Repository](https://doi.org/10.24432/C5K306) |
+| Credit Card Clients | [UCI ML Repository](https://doi.org/10.24432/C55S3H) |
+
 
 ## Authors
 
