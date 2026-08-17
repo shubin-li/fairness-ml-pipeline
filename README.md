@@ -116,7 +116,7 @@ src/
 │   ├── german_fairness.py
 │   ├── adult_visualization.py      # Dataset config feeding the shared plotting layer
 │   └── german_visualization.py
-├── partner-extensions/             # OULAD, Bank Marketing, Credit Card Clients (notebooks)
+├── teammate-extensions/             # OULAD, Bank Marketing, Credit Card Clients (notebooks)
 ├── results/                        # Metric exports and figures per dataset
 │   ├── nhanes/ , benchmark/adult/ , benchmark/german/
 │   ├── oulad/ , More Datasets/
