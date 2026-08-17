@@ -32,9 +32,9 @@ Two diagnostic criteria run as pure post-processing over the evaluation output, 
 | Binary attributes behave consistently | Gender gaps fall to at or near 0.05 on every dataset at negligible F1 cost |
 
 <!-- 图 2：NHANES fairness-performance trade-off（论文 Fig. 2）
-![Fairness-performance trade-off on NHANES](src/results/nhanes/figures/paper_fig2_nhanes_tradeoff.png)
 *Hollow marker at zero F1 and zero gap: the degenerate configuration the False-Fairness Criterion flags.*
 -->
+![Fairness-performance trade-off on NHANES](src/results/nhanes/figures/paper_fig2_nhanes_tradeoff.png)
 
 ## Methodology
 
@@ -71,6 +71,7 @@ Group-level output records selection rate, TPR, FPR, subgroup size, and true pre
 <!-- 图 3：六数据集 gender 对比（论文 Fig. 5）
 ![Gender disparity before and after mitigation](src/results/nhanes/figures/paper_fig5_gender_cross.png)
 -->
+![Gender disparity before and after mitigation](src/results/nhanes/figures/paper_fig5_gender_cross.png)
 
 ### Shared Visualisation Layer
 
