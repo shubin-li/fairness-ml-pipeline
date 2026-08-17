@@ -84,7 +84,7 @@ Reading fairness results is where cross-dataset work usually breaks down: each d
 | Diagnostics | False-fairness quadrant, amplification decomposition |
 | Cross-domain | Heatmap, gender comparison, reduction matrix across datasets |
 
-Both IEEE paper style and presentation style render from the same code path, and every figure regenerates from the archived result CSVs. Adding a dataset therefore costs one adapter and one config, not a plotting rewrite.
+Every figure regenerates from the archived result CSVs. Adding a dataset therefore costs one adapter and one config, not a plotting rewrite.
 
 ## Tech Stack
 
@@ -145,14 +145,13 @@ Two-person practicum. My work spanned every stage:
 - **NHANES adapter (solo):** loading, EDA, cleaning, and preprocessing of ten survey tables, each with its own skip patterns and special missing-value codes that turn "skipped" into "no" if handled carelessly. Constructed 9 of the 23 features in the final dataset, and built the PHQ-9 depression label at the clinical cutoff of 10
 - **Modelling:** training and tuning of the three classifiers across NHANES, Adult Income, and German Credit, plus the connecting layer between models, mitigation, and evaluation
 - **Experiments:** the full matrix on the three anchor datasets, 105 configurations in total
-- **Visualisation layer:** the shared plotting module described above, covering baseline, mitigation, trade-off, diagnostic, and cross-domain figures. 20+ figures per dataset from one config object, in both IEEE and presentation styles, all regenerable from the archived CSVs
+- **Visualisation layer:** the shared plotting module described above, covering baseline, mitigation, trade-off, diagnostic, and cross-domain figures. 20+ figures per dataset from one config object, all regenerable from the archived CSVs
 - **Literature and writing:** the shared fairness background, the healthcare section, and the survey of mitigation methods; paper sections split along the same lines as the experimental work
 
-One finding came directly out of the modelling work: a default Random Forest reached 0.87 accuracy and 0.72 AUC under 5-fold CV while producing essentially zero recall. Tuning on ROC-AUC alone never exposes this, because AUC is threshold-independent. That result is the origin of the False-Fairness Criterion.
 
 ## Limitations
 
-Stated in the paper rather than glossed over. Results come from one stratified split under seed 42, so point estimates carry split sensitivity, and no confidence intervals are reported. Domain and prevalence co-vary across the core datasets, so every characteristic-related statement stays descriptive rather than causal. The False-Fairness Criterion is built on a recall floor and is structurally blind to the all-positive collapse under high prevalence. Analysis treats one sensitive attribute at a time; crossing race with gender on NHANES leaves roughly three positive cases in the smallest cell, so intersectional analysis needs a larger sample.
+Results come from one stratified split under seed 42, so point estimates carry split sensitivity, and no confidence intervals are reported. Domain and prevalence co-vary across the core datasets, so every characteristic-related statement stays descriptive rather than causal. The False-Fairness Criterion is built on a recall floor and is structurally blind to the all-positive collapse under high prevalence. Analysis treats one sensitive attribute at a time, intersectional analysis needs a larger sample.
 
 The pipeline is an audit tool for models, not a decision system. Real deployment would require robustness checks, expert input on the fairness objective, and post-launch monitoring.
 
